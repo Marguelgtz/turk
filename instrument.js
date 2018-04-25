@@ -27,8 +27,8 @@ var longestKeyLength = 40;
 var keyLength = 7;
 var keyWidth = 5;
 var keyThickness = 2;
-var keyLengthSpacing = keyLength + 4;
-var keyLengthOffset = 50;
+var keyLengthSpacing = -keyLength - 4;
+var keyLengthOffset = -50;
 var keyWidthSpacing = keyWidth + 4;
 var keyWidthOffset = -keyWidthSpacing * 5.5;
 
@@ -111,7 +111,7 @@ function init() {
   sphereGeo = new THREE.SphereGeometry(ballRadius, 16, 16); // more symmetrical is having something like 24, 12
 
   camera.position.y = 50;
-  camera.position.x = 220;
+  camera.position.x = -220;
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
   // start the renderer
@@ -170,6 +170,8 @@ function addKeys() {
 
     key.position.x = parseInt( i / 12 ) * keyLengthSpacing + keyLengthOffset;
     key.position.z = ( i % 12 ) * keyWidthSpacing + keyWidthOffset;
+    // put top of key at y == 0, for simplicity
+    key.position.y = -keyThickness/2;
 
     scene.add(key);
 
