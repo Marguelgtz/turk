@@ -24,8 +24,13 @@ var cannonHeight = 40;
 
 var shortestKeyLength = 15;
 var longestKeyLength = 40;
+var keyLength = 7;
 var keyWidth = 5;
 var keyThickness = 2;
+var keyLengthSpacing = keyLength + 4;
+var keyLengthOffset = 50;
+var keyWidthSpacing = keyWidth + 4;
+var keyWidthOffset = -keyWidthSpacing * 5.5;
 
 var numKeys = 88;
 
@@ -99,18 +104,14 @@ function init() {
 
   // create a WebGL renderer, camera
   // and a scene
-  renderer = new THREE.WebGLRenderer();
+  renderer = new THREE.WebGLRenderer( {antialias: true} );
   camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
   scene = new THREE.Scene();
   
   sphereGeo = new THREE.SphereGeometry(ballRadius, 16, 16); // more symmetrical is having something like 24, 12
-  tubeGeo = new THREE.TubeGeometry(bucketTopRadius, bucketBaseRadius, bucketTopRadius - bucketThickness, bucketBaseRadius - bucketThickness, bucketHeight, 16, 1, false);
-  cylGeoTop = new THREE.CylinderGeometry(tubeRadius, tubeRadius, cannonHeight / 2, 32, 1, false);
-  cylGeoBottom = new THREE.CylinderGeometry(darkBaseRadius, darkBaseRadius, darkBaseHeight, 16, 1);
-  spokeGeo = new THREE.CylinderGeometry(tubeRadius, tubeRadius, bucketRadiusToCannon, 32, 1, false);
 
-  camera.position.y = 200;
-  camera.position.z = 200;
+  camera.position.y = 50;
+  camera.position.x = 220;
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
   // start the renderer
@@ -129,11 +130,13 @@ function init() {
 }
 
 function fillScene() {
-  addCannon();
   addLighting();
+  // drops the balls
+  addDropper();
+  // catches the balls
   addKeys();
-  addBuckets();
-  addTubing();
+  // holds the whackers
+  addHousing();
 }
 
 function addLighting() {
@@ -154,131 +157,27 @@ function addLighting() {
   scene.add(light2);
 }
 
-function addCannon() {
-  var cannon = new THREE.Mesh(
-    new THREE.TubeGeometry(cannonTopRadius, cannonBaseRadius, cannonTopRadius - cannonThickness, cannonBaseRadius - cannonThickness, cannonHeight, 32, 1, false),
-    new THREE.MeshPhongMaterial({ color: brassColor })
-  );
-
-  scene.add(cannon);
-
-  var cannonBase = new THREE.Mesh(
-    new THREE.CylinderGeometry(cannonBaseRadius, cannonBaseRadius, tubeRadius * 2, 32, 1, false),
-    new THREE.MeshPhongMaterial({ color: brassColor })
-  );
-
-  cannonBase.position.y = -cannonHeight / 2;
-
-  scene.add(cannonBase);
-
-  var centralSphere = new THREE.Mesh(
-    new THREE.SphereGeometry(cannonBaseRadius, 16, 16),
-    new THREE.MeshPhongMaterial({ color: brassColor })
-  );
-
-  centralSphere.position.y = -cannonHeight / 2;
-
-  scene.add(centralSphere);
+function addDropper() {
 }
 
 function addKeys() {
   for (var i = 0; i < numKeys; i++) {
-    // use linear interpolation to find key length
-    var weight = i / numKeys;
-    var keyLength = longestKeyLength + (shortestKeyLength - longestKeyLength) * weight;
-
+    // 8 rows of 12 keys each, 4 at highest range
     var key = new THREE.Mesh(
       new THREE.CubeGeometry(keyLength, keyThickness, keyWidth),
       new THREE.MeshPhongMaterial({ color: brassColor })
     );
 
-    key.position.x = keyRadius;
+    key.position.x = parseInt( i / 12 ) * keyLengthSpacing + keyLengthOffset;
+    key.position.z = ( i % 12 ) * keyWidthSpacing + keyWidthOffset;
 
-    var temp = new THREE.Object3D();
-    temp.add(key);
-
-    temp.rotation.y = (i / numKeys) * 2 * Math.PI;
-
-    scene.add(temp);
+    scene.add(key);
 
     keys.push(key);
   }
 }
 
-function addBuckets() {
-  for (var i = 0; i < numKeys; i++) {
-    var bucket = new THREE.Mesh(
-      // new THREE.CylinderGeometry(bucketTopRadius, bucketBaseRadius, bucketHeight, 32, 1, false),
-      tubeGeo,
-      new THREE.MeshPhongMaterial({ color: brassColor })
-    );
-
-    bucket.position.x = bucketRadiusToCannon - bucketPositionOffset;
-    bucket.rotation.z = Math.PI / 2 - firingAngle;
-
-    var temp = new THREE.Object3D();
-    temp.add(bucket);
-
-    temp.rotation.y = (i / numKeys) * 2 * Math.PI;
-
-    scene.add(temp);
-  }
-}
-
-function addTubing() {
-  var bottomTorus = new THREE.Mesh(
-    new THREE.TorusGeometry(bucketRadiusToCannon, tubeRadius, 8, numKeys, 2 * Math.PI),
-    new THREE.MeshPhongMaterial({ color: tubeColor })
-  );
-
-  bottomTorus.rotation.x = Math.PI / 2;
-  bottomTorus.position.y = -cannonHeight / 2;
-
-  scene.add(bottomTorus);
-  
-  for (var i = 0; i < numKeys; i++) {
-    var upTube = new THREE.Mesh(
-      cylGeoTop,
-      new THREE.MeshPhongMaterial({ color: tubeColor })
-    );
-
-    upTube.position.x = bucketRadiusToCannon;
-
-    var darkBucketBase = new THREE.Mesh(
-      cylGeoBottom,
-      new THREE.MeshPhongMaterial({ color: blackColor })
-    );
-
-    darkBucketBase.position.y = cannonHeight / 4;
-    darkBucketBase.position.x = bucketRadiusToCannon;
-
-    var temp = new THREE.Object3D();
-    temp.add(upTube);
-    temp.add(darkBucketBase);
-
-    temp.position.y = -cannonHeight / 4;
-    temp.rotation.y = i * 2 * Math.PI / numKeys;
-
-    scene.add(temp);
-  }
-
-  for (var i = 0; i < numCentralizingPipes; i++) {
-    var inTube = new THREE.Mesh(
-      spokeGeo,
-      new THREE.MeshPhongMaterial({ color: tubeColor })
-    );
-
-    inTube.position.x = bucketRadiusToCannon / 2;
-    inTube.position.y = -cannonHeight / 2;
-    inTube.rotation.z = Math.PI / 2;
-
-    var tube = new THREE.Object3D();
-    tube.add(inTube);
-
-    tube.rotation.y = (i / numCentralizingPipes) * 2 * Math.PI;
-
-    scene.add(tube);
-  }
+function addHousing() {
 }
 
 function addBall(keyTarget) {
@@ -384,7 +283,7 @@ function darkenKeys() {
 }
 
 function addControls() {
-    controls = new THREE.TrackballControls(camera, renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
     var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
     controls.rotateSpeed = 1;
     controls.zoomSpeed = 0.1;
