@@ -51,10 +51,12 @@ var ballFadeDuration = 1730;
 var dropStart = -ballHeadstart;
 var dropEnd, bounceApex;
 var hitStart = 0;
+var hitSunk = 0.4 * ballFadeDuration;
 var hitEnd = ballFadeDuration;
 
 var timeInSong = -startDelay;
 var localStartTime;
+//var prevNotesLength = 999999999;
 
 var sphereGeo;
 var sphereMtl;
@@ -218,6 +220,9 @@ function addHousing() {
 }
 
 function animate() {
+  //if ( prevNotesLength !== notes.length ) {
+  //  newTune();
+  //}
   requestAnimationFrame(animate);
 
   controls.update();
@@ -238,6 +243,8 @@ function animate() {
   darkenKeys(currTime);
 
   renderer.render(scene, camera);
+
+  //prevNotesLength = notes.length;
 }
 
 function Ball(keyTarget,dropper,t) {
@@ -271,7 +278,7 @@ function addBallsToMusic(t) {
   while (notes[0].time - ballHeadstart < t ) {
     // if ball time has passed - don't add it, if so; just remove note
     var keyID = notes[0].note - MIDI.pianoKeyOffset;
-    if (notes[0].time + ballFadeDuration > t ) {
+    if (notes[0].time + hitEnd > t ) {
       addBall(keyID, currentDropper, notes[0].time);
     } else {
       // note the ball's effect on the key
@@ -311,10 +318,11 @@ function moveBalls(t) {
     var ball = balls[i];
     var animTime = t - ball.time;
 
-    // compute location of ball in one of three zones:
+    // compute location of ball in one of a few zones:
     // 1) dropping from dropper: dropStart to dropEnd
     // 2) bouncing from whacker: dropEnd to hitStart
     // 3) sinking into key: hitStart to hitEnd
+    // 4) sunk, and key fading back to its normal color.
     if (animTime < dropEnd) {
       // dropping from dropper
       timeDiff = (animTime-dropStart)/(dropEnd-dropStart);
@@ -328,10 +336,10 @@ function moveBalls(t) {
       var timeApex = (animTime-bounceApex)/(hitStart-bounceApex);
       y = bounceHeight - bounceHeight * timeApex*timeApex;
       ball.object.position.set(x,y,z);
-    } else if (animTime < hitEnd) {
+    } else if (animTime < hitSunk) {
       // ball sinking into key
       ball.object.position.copy(ball.end);
-      timeDiff = (animTime-hitStart)/(hitEnd-hitStart);
+      timeDiff = (animTime-hitStart)/(hitSunk-hitStart);
       ball.object.position.y = -timeDiff * 2 * ballRadius;
       if ( !ball.hit ) {
         ball.hit = true;
@@ -381,20 +389,36 @@ function darkenKeys(t) {
   }
 }
 
+function resetKeyCounts() {
+  for (var i = 0; i < numKeys; i++) {
+    var key = keys[i];
+    key.ballCount = 0;
+    key.frameBallCount = 0;
+    key.lastTap = 0;
+    key.material.color.setRGB(key.r, key.g, key.b);
+  }
+}
+
+function newTune() {
+  resetKeyCounts();
+  darkenKeys(0);
+}
+
 function resetTimer(songTime) {
   timeInSong = songTime;
   localStartTime = Date.now();
+  newTune();
 }
 
 function addControls() {
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls = new THREE.TrackballControls(camera, renderer.domElement);
     var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
-    controls.rotateSpeed = 1;
+    controls.rotateSpeed = 3;
     controls.zoomSpeed = 1;
     controls.panSpeed = 1;
 
-    controls.minDistance = radius * 1.1;
-    controls.maxDistance = radius * 25;
+    //controls.minDistance = radius * 0.1;
+    //controls.maxDistance = radius * 25;
 
     controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
 }
