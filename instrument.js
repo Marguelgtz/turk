@@ -36,8 +36,10 @@ var scaleCount = ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*key
 var currentDropper = 0;
 var numDroppers = 10;
 var dropperWidth = 10;
+var dropperRadius = 1.5 * ballRadius;
 var dropperWidthOffset = -dropperWidth * (numDroppers-1) / 2;
 var dropperHeight = 100;
+var dropperPartHeight = 10;
 
 var whackerHeight = 30;
 var bounceHeight = 70;
@@ -58,8 +60,8 @@ var timeInSong = -startDelay;
 var localStartTime;
 var prevNotesLength = 999999999;
 
-var sphereGeo;
-var sphereMtl;
+var sphereGeo, dropperGeo, dropperSphereGeo;
+var sphereMtl, dropperMtl;
 
 function init() {
   var WIDTH = $('.rest').width() - 5,
@@ -85,8 +87,10 @@ function init() {
   camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
   scene = new THREE.Scene();
   
-  sphereGeo = new THREE.SphereGeometry(ballRadius, 20, 10); // more symmetrical is having something like 24, 12
+  sphereGeo = new THREE.SphereGeometry(ballRadius, 20, 10);
   sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
+  dropperGeo = new THREE.CylinderGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
+  dropperMtl = sphereMtl;
 
   camera.position.x = -190;
   camera.position.y = 120;
@@ -145,6 +149,24 @@ function addLighting() {
 }
 
 function addDropper() {
+  // cross bar
+  var crossbarRadius = 0.3 * ballRadius;
+  var crossbar = new THREE.Mesh(
+    new THREE.CylinderGeometry( crossbarRadius, crossbarRadius, numDroppers*dropperWidth, 10, 1),
+    dropperMtl
+  );
+  crossbar.position.set(0, dropperHeight + dropperPartHeight/2 - crossbarRadius, 0);
+  crossbar.rotation.set(Math.PI/2, 0, 0);
+  scene.add(crossbar);
+
+  for (var i = 0; i < numDroppers; i++) {
+    var dropper = new THREE.Mesh(
+      dropperGeo,
+      dropperMtl
+    );
+    dropper.position.set(0, dropperHeight, i * dropperWidth + dropperWidthOffset);
+    scene.add(dropper);
+  }
 }
 
 function addKeys() {
@@ -220,6 +242,7 @@ function addHousing() {
 }
 
 function animate() {
+  // hack - better would be to get a signal from when the music player plays TODO
   if ( prevNotesLength !== notes.length ) {
     newTune();
   }
@@ -420,7 +443,7 @@ function resetTimer(songTime) {
 }
 
 function addControls() {
-    controls = new THREE.TrackballControls(camera, renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
     var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
     controls.rotateSpeed = 3;
     controls.zoomSpeed = 1;
