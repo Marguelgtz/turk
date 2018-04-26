@@ -69,7 +69,7 @@ var bounceOut   = Math.cos(bounceAngle) * bounceVelocity;
 
 var keys = [];
 var balls = [];
-var queue = []; // pronounced: kWEH.
+var queue = [];
 
 var ballHeadstart = 1730;
 
@@ -77,20 +77,6 @@ var timeInSong = -startDelay;
 var lastUpdatedTime;
 
 var sphereGeo, tubeGeo, cylGeoTop, cylGeoBottom, spokeGeo;
-
-function Ball(keyTarget) {
-  this.target = keyTarget;
-  this.angle = 2 * Math.PI * keyTarget / numKeys;
-  this.velocityUp = initVelocity * Math.sin(firingAngle);
-  this.cannon = new THREE.Mesh(
-    sphereGeo,
-    new THREE.MeshPhongMaterial({ color: ballColor })
-  );
-  this.cannon.position.y = 0;
-  this.object = new THREE.Object3D();
-  this.object.add(this.cannon);
-  this.object.rotation.y = this.angle;
-}
 
 function init() {
   var WIDTH = $('.rest').width() - 5,
@@ -182,16 +168,6 @@ function addKeys() {
 function addHousing() {
 }
 
-function addBall(keyTarget) {
-  var ball = new Ball(keyTarget);
-
-  queue.push(Date.now());
-
-  balls.push(ball);
-
-  scene.add(ball.object);
-}
-
 function animate() {
   requestAnimationFrame(animate);
 
@@ -205,6 +181,30 @@ function animate() {
   darkenKeys();
 
   renderer.render(scene, camera);
+}
+
+function Ball(keyTarget) {
+  this.target = keyTarget;
+  this.angle = 2 * Math.PI * keyTarget / numKeys;
+  this.velocityUp = initVelocity * Math.sin(firingAngle);
+  this.cannon = new THREE.Mesh(
+    sphereGeo,
+    new THREE.MeshPhongMaterial({ color: ballColor })
+  );
+  this.cannon.position.y = 0;
+  this.object = new THREE.Object3D();
+  this.object.add(this.cannon);
+  this.object.rotation.y = this.angle;
+}
+
+function addBall(keyTarget) {
+  var ball = new Ball(keyTarget);
+
+  queue.push(Date.now());
+
+  balls.push(ball);
+
+  scene.add(ball.object);
 }
 
 // where the magic happens
@@ -230,21 +230,21 @@ function throwBallsToMusic() {
   }
 }
 
-function resetTimer(songTime) {
-  timeInSong = songTime;
-  lastUpdatedTime = Date.now();
-}
-
 function moveBalls() {
   for (var i = balls.length - 1; i >= 0; i--) {
     var ball = balls[i];
 
+    // if ball is below Y plane
     if (ball.cannon.position.y < 0) {
+      // if ball is at or beyond bucket, remove it
       if (ball.cannon.position.x >= bucketRadiusToCannon) {
         scene.remove(ball.object);
+        // remove ball from array
         balls.splice(i, 1);
         continue;
       } else {
+        // must be first bounce event
+        // time from now to when ball was added
         ballHeadstart = Date.now() - queue.shift(1);
 
         makeKeyGlow(ball.target);
@@ -255,6 +255,7 @@ function moveBalls() {
       }
     }
 
+    // subtract gravity from velocity
     ball.velocityUp += G;
 
     if (ball.cannon.position.x < bucketRadiusToCannon) {
@@ -282,6 +283,11 @@ function darkenKeys() {
       key.material.color.setHex(transitionColors[state - 1]);
     }
   }
+}
+
+function resetTimer(songTime) {
+  timeInSong = songTime;
+  lastUpdatedTime = Date.now();
 }
 
 function addControls() {
