@@ -398,7 +398,11 @@ function moveBalls(t) {
       // ball sinking into key
       ball.object.position.copy(ball.end);
       timeDiff = (animTime-hitStart)/(hitSunk-hitStart);
+      // simple sink:
       ball.object.position.y = -timeDiff * 2 * ballRadius;
+      // melt variation:
+      //ball.object.position.y = -timeDiff * ballRadius;
+      //ball.object.scale.y = 1-timeDiff;
       if ( !ball.hit ) {
         ball.hit = true;
         keys[ball.target].lastTap = t;
