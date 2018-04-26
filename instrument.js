@@ -94,7 +94,8 @@ function init() {
   camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
   scene = new THREE.Scene();
   
-  sphereGeo = new THREE.SphereGeometry(ballRadius, 16, 16); // more symmetrical is having something like 24, 12
+  sphereGeo = new THREE.SphereGeometry(ballRadius, 20, 10); // more symmetrical is having something like 24, 12
+  sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
 
   camera.position.y = 50;
   camera.position.x = -220;
@@ -189,7 +190,7 @@ function Ball(keyTarget) {
   this.velocityUp = initVelocity * Math.sin(firingAngle);
   this.cannon = new THREE.Mesh(
     sphereGeo,
-    new THREE.MeshPhongMaterial({ color: ballColor })
+    sphereMtl
   );
   this.cannon.position.y = 0;
   this.object = new THREE.Object3D();
