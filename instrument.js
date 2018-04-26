@@ -22,7 +22,7 @@ var keyLength = 7;
 var keyWidth = 5;
 var keyThickness = 2;
 var keyLengthSpacing = -keyLength - 4;
-var keyLengthOffset = -50;
+var keyLengthOffset = -150;
 var keyWidthSpacing = keyWidth + 4;
 var keyWidthOffset = -keyWidthSpacing * 5.5;
 
@@ -117,21 +117,29 @@ function fillScene() {
 }
 
 function addLighting() {
-  var light1 = new THREE.PointLight(0xFFFFFF);
+  var light1 = new THREE.DirectionalLight(0xFFFFFF);
 
   light1.position.x = 0;
   light1.position.y = 500;
-  light1.position.z = 500;
+  light1.position.z = 0;
 
   scene.add(light1);
 
-  var light2 = new THREE.PointLight(0xFFFFFF);
+  var light2 = new THREE.DirectionalLight(0xbbbbbb);
 
-  light2.position.x = 0;
-  light2.position.y = 500;
+  light2.position.x = 200;
+  light2.position.y = -200;
   light2.position.z = -500;
 
   scene.add(light2);
+
+  var light3 = new THREE.DirectionalLight(0xbbbbbb);
+
+  light3.position.x = -300;
+  light3.position.y = -300;
+  light3.position.z = 400;
+
+  scene.add(light3);
 }
 
 function addDropper() {
@@ -148,6 +156,48 @@ function addKeys() {
     // bit lazy here, adding properties to the Mesh itself
     key.ballCount = 0;
     key.frameBallCount = 0;
+    key.lastTap = 0;
+
+    // key "unhighlighted" color
+    switch( parseInt( i / 12 ) ) {
+      case 0:
+      key.r = 144; key.g = 25; key.b = 255;
+      break;
+      case 1:
+      key.r = 25; key.g = 79; key.b = 255;
+      break;
+      case 2:
+      key.r = 25; key.g = 252; key.b = 255;
+      break;
+      case 3:
+      key.r = 25; key.g = 255; key.b = 85;
+      break;
+      case 4:
+      key.r = 139; key.g = 255; key.b = 25;
+      break;
+      case 5:
+      key.r = 255; key.g = 198; key.b = 25;
+      break;
+      case 6:
+      key.r = 255; key.g = 25; key.b = 25;
+      break;
+      case 7:
+      key.r = 255; key.g = 25; key.b = 193;
+      break;
+    }
+    key.r /= 255;
+    key.g /= 255;
+    key.b /= 255;
+    // is it a black key? darken
+    var keyType = i % 12;
+    if ( keyType === 1 || keyType === 4 || keyType === 6 || keyType === 9 || keyType === 11 ) {
+      // not gamma corrected, but so be it.
+      var blackScale = 0.6;
+      key.r *= blackScale;
+      key.g *= blackScale;
+      key.b *= blackScale;
+    }
+    key.material.color.setRGB(key.r, key.g, key.b);
 
     keyPosition( i, key.position );
     setKeyDepth(key);
@@ -185,7 +235,7 @@ function animate() {
   }
 
   moveBalls(currTime);
-  darkenKeys();
+  darkenKeys(currTime);
 
   renderer.render(scene, camera);
 }
@@ -196,6 +246,7 @@ function Ball(keyTarget,dropper,t) {
   this.end = new THREE.Vector3();
   keyPosition( keyTarget, this.end );
   this.time = t;
+  this.hit = false;
   this.object = new THREE.Mesh(
     sphereGeo,
     sphereMtl
@@ -282,8 +333,10 @@ function moveBalls(t) {
       ball.object.position.copy(ball.end);
       timeDiff = (animTime-hitStart)/(hitEnd-hitStart);
       ball.object.position.y = -timeDiff * 2 * ballRadius;
-      // still sinking
-      makeKeyGlow(ball.target);
+      if ( !ball.hit ) {
+        ball.hit = true;
+        keys[ball.target].lastTap = t;
+      }
       extendKeyFraction(ball.target,timeDiff);
     } else {
       // delete ball, we're at end of life
@@ -295,25 +348,30 @@ function moveBalls(t) {
   }
 }
 
-function makeKeyGlow(keyID) {
-  keys[keyID].material.color.setHex(transitionColors[transitionColors.length - 1]);
-}
-
 function setKeyDepth(key) {
   var heightAdjust = scaleCount * (key.ballCount + key.frameBallCount);
   key.scale.y = heightAdjust+1;
   key.position.y = -ballRadius - keyThickness/2 - heightAdjust;
 }
 
-function darkenKeys() {
+function darkenKeys(t) {
   for (var i = 0; i < numKeys; i++) {
     var key = keys[i];
 
-    var state = transitionColors.indexOf(key.material.color.getHex());
-    if (state === 0) {
-      continue;
-    } else {
-      key.material.color.setHex(transitionColors[state - 1]);
+    // take last time key was tapped and fade
+    if ( key.lastTap > 0 ) {
+      if ( key.lastTap + ballFadeDuration > t ) {
+        var fadeTime = (t - key.lastTap) / ballFadeDuration;
+        key.material.color.setRGB(
+          (1-fadeTime) + fadeTime*key.r,
+          (1-fadeTime) + fadeTime*key.g,
+          (1-fadeTime) + fadeTime*key.b
+        );
+      } else {
+        // set back to clear
+        key.material.color.setRGB(key.r, key.g, key.b);
+        key.lastTap = 0;
+      }  
     }
 
     // compute key height from fraction and full.
