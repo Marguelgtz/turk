@@ -56,7 +56,7 @@ var hitEnd = ballFadeDuration;
 
 var timeInSong = -startDelay;
 var localStartTime;
-//var prevNotesLength = 999999999;
+var prevNotesLength = 999999999;
 
 var sphereGeo;
 var sphereMtl;
@@ -220,9 +220,9 @@ function addHousing() {
 }
 
 function animate() {
-  //if ( prevNotesLength !== notes.length ) {
-  //  newTune();
-  //}
+  if ( prevNotesLength !== notes.length ) {
+    newTune();
+  }
   requestAnimationFrame(animate);
 
   controls.update();
@@ -244,7 +244,7 @@ function animate() {
 
   renderer.render(scene, camera);
 
-  //prevNotesLength = notes.length;
+  prevNotesLength = notes.length;
 }
 
 function Ball(keyTarget,dropper,t) {
@@ -356,6 +356,15 @@ function moveBalls(t) {
   }
 }
 
+function clearBalls() {
+  for (var i = balls.length - 1; i >= 0; i--) {
+    var ball = balls[i];
+    scene.remove(ball.object);
+    // remove ball from array
+    balls.splice(i, 1);
+  }
+}
+
 function setKeyDepth(key) {
   var heightAdjust = scaleCount * (key.ballCount + key.frameBallCount);
   key.scale.y = heightAdjust+1;
@@ -400,6 +409,7 @@ function resetKeyCounts() {
 }
 
 function newTune() {
+  clearBalls();
   resetKeyCounts();
   darkenKeys(0);
 }
@@ -407,7 +417,6 @@ function newTune() {
 function resetTimer(songTime) {
   timeInSong = songTime;
   localStartTime = Date.now();
-  newTune();
 }
 
 function addControls() {
