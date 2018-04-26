@@ -155,15 +155,19 @@ function addKeys() {
       new THREE.MeshPhongMaterial({ color: brassColor })
     );
 
-    key.position.x = parseInt( i / 12 ) * keyLengthSpacing + keyLengthOffset;
-    key.position.z = ( i % 12 ) * keyWidthSpacing + keyWidthOffset;
-    // put top of key at y == 0, for simplicity
-    key.position.y = -keyThickness/2;
+    keyPosition( i, key.position );
 
     scene.add(key);
 
     keys.push(key);
   }
+}
+
+function keyPosition(id, pos) {
+  pos.x = parseInt( id / 12 ) * keyLengthSpacing + keyLengthOffset;
+  pos.z = ( id % 12 ) * keyWidthSpacing + keyWidthOffset;
+  // put top of key at y == 0, for simplicity
+  pos.y = -keyThickness/2;
 }
 
 function addHousing() {
