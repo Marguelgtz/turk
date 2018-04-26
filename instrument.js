@@ -1,3 +1,5 @@
+"use strict";
+
 var renderer, scene, camera, controls;
 
 var transitionColors = [
@@ -67,16 +69,31 @@ var bounceVelocity = -G * bounceHangtime / 2;
 var bounceAngle = Math.acos((bucketRadiusToCannon - keyRadius) / (bounceHangtime * bounceVelocity));
 var bounceOut   = Math.cos(bounceAngle) * bounceVelocity;
 
+var currentDropper = 0;
+var numDroppers = 10;
+var dropperWidth = 10;
+var dropperWidthOffset = -dropperWidth * (numDroppers-1) / 2;
+var dropperHeight = 100;
+
+var whackerHeight = 30;
+var bounceHeight = 70;
+
 var keys = [];
 var balls = [];
-var queue = [];
 
 var ballHeadstart = 1730;
+var ballFadeDuration = 300;
+
+var dropStart = -ballHeadstart;
+var dropEnd, bounceApex;
+var hitStart = 0;
+var hitEnd = ballFadeDuration;
 
 var timeInSong = -startDelay;
-var lastUpdatedTime;
+var localStartTime;
 
-var sphereGeo, tubeGeo, cylGeoTop, cylGeoBottom, spokeGeo;
+var sphereGeo;
+var sphereMtl;
 
 function init() {
   var WIDTH = $('.rest').width() - 5,
@@ -88,6 +105,14 @@ function init() {
 
   console.log('Size: ' + WIDTH + ' ' + HEIGHT);
 
+  // Determine how much time is spent falling, bouncing up, and bouncing down
+  var span1 = Math.sqrt(dropperHeight - whackerHeight);
+  var span2 = Math.sqrt(bounceHeight - whackerHeight);
+  var span3 = Math.sqrt(bounceHeight);
+  var spanSum = span1 + span2 + span3;
+  dropEnd = dropStart * (span2 + span3)/spanSum;
+  bounceApex = dropStart * span3/spanSum;
+
   // create a WebGL renderer, camera
   // and a scene
   renderer = new THREE.WebGLRenderer( {antialias: true} );
@@ -97,8 +122,9 @@ function init() {
   sphereGeo = new THREE.SphereGeometry(ballRadius, 20, 10); // more symmetrical is having something like 24, 12
   sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
 
-  camera.position.y = 50;
-  camera.position.x = -220;
+  camera.position.x = -190;
+  camera.position.y = 120;
+  camera.position.z = 170;
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
   // start the renderer
@@ -178,56 +204,58 @@ function animate() {
 
   controls.update();
 
+  // first time called, establish what time it is when the song starts
+  localStartTime = localStartTime || Date.now();
+  
+  var timeFromStart = Date.now() - localStartTime;
+  
+  // currTime is how far into the song itself we are
+  var currTime = timeInSong + timeFromStart;
+
   if (musicPlaying) {
-    throwBallsToMusic();
+    addBallsToMusic(currTime);
   }
 
-  moveBalls();
+  moveBalls(currTime);
   darkenKeys();
 
   renderer.render(scene, camera);
 }
 
-function Ball(keyTarget) {
+function Ball(keyTarget,dropper,t) {
   this.target = keyTarget;
-  this.angle = 2 * Math.PI * keyTarget / numKeys;
-  this.velocityUp = initVelocity * Math.sin(firingAngle);
-  this.cannon = new THREE.Mesh(
+  this.start = new THREE.Vector3(0, dropperHeight, dropper * dropperWidth + dropperWidthOffset);
+  this.end = new THREE.Vector3();
+  keyPosition( keyTarget, this.end );
+  this.time = t;
+  this.object = new THREE.Mesh(
     sphereGeo,
     sphereMtl
   );
-  this.cannon.position.y = 0;
-  this.object = new THREE.Object3D();
-  this.object.add(this.cannon);
-  this.object.rotation.y = this.angle;
+  this.object.position.copy( this.start );
 }
 
-function addBall(keyTarget) {
-  var ball = new Ball(keyTarget);
-
-  queue.push(Date.now());
+function addBall(keyTarget,dropper,t) {
+  var ball = new Ball(keyTarget,dropper,t);
 
   balls.push(ball);
 
   scene.add(ball.object);
 }
 
-// where the magic happens
-function throwBallsToMusic() {
+// add balls if time to do so
+function addBallsToMusic(t) {
   if (notes.length == 0)
     return;
 
-  lastUpdatedTime = lastUpdatedTime || Date.now();
-
-  var delta = 0.01;
-  
-  var interpolatedTime = Date.now() - lastUpdatedTime;
-  
-  var currTime = timeInSong + interpolatedTime;
-
-  while (notes[0].time < currTime + ballHeadstart) {
-    addBall(notes[0].note - MIDI.pianoKeyOffset);
+  while (notes[0].time < t + ballHeadstart) {
+    // TODO: test if ball time has passed - don't add it, if so; just remove note
+    addBall(notes[0].note - MIDI.pianoKeyOffset, currentDropper, notes[0].time);
     notes.splice(0, 1);
+    currentDropper++;
+    if ( currentDropper >= numDroppers ) {
+      currentDropper = 0;
+    }
 
     if (notes.length === 0) {
       return;
@@ -235,40 +263,44 @@ function throwBallsToMusic() {
   }
 }
 
-function moveBalls() {
+function moveBalls(t) {
+  var x,y,z, timeDiff;
   for (var i = balls.length - 1; i >= 0; i--) {
     var ball = balls[i];
+    var animTime = t - ball.time;
 
-    // if ball is below Y plane
-    if (ball.cannon.position.y < 0) {
-      // if ball is at or beyond bucket, remove it
-      if (ball.cannon.position.x >= bucketRadiusToCannon) {
-        scene.remove(ball.object);
-        // remove ball from array
-        balls.splice(i, 1);
-        continue;
-      } else {
-        // must be first bounce event
-        // time from now to when ball was added
-        ballHeadstart = Date.now() - queue.shift(1);
-
-        makeKeyGlow(ball.target);
-
-        // and bounce back up!
-        ball.velocityUp = bounceVelocity * Math.sin(bounceAngle);
-        ball.cannon.position.y = 0;
-      }
-    }
-
-    // subtract gravity from velocity
-    ball.velocityUp += G;
-
-    if (ball.cannon.position.x < bucketRadiusToCannon) {
-      ball.cannon.position.y += ball.velocityUp;
-      ball.cannon.position.x += velocityOut;
+    // compute location of ball in one of three zones:
+    // 1) dropping from dropper: dropStart to dropEnd
+    // 2) bouncing from whacker: dropEnd to hitStart
+    // 3) sinking into key: hitStart to hitEnd
+    if (animTime < dropEnd) {
+      // dropping from dropper
+      timeDiff = (animTime-dropStart)/(dropEnd-dropStart);
+      y = dropperHeight - (dropperHeight-whackerHeight) * timeDiff*timeDiff;
+      ball.object.position.set(ball.start.x,y,ball.start.z);
+    } else if (animTime < hitStart) {
+      // hit by whacker and continuing
+      timeDiff = (animTime-dropEnd)/(hitStart-dropEnd);
+      x = ball.start.x + (ball.end.x-ball.start.x) * timeDiff;
+      z = ball.start.z + (ball.end.z-ball.start.z) * timeDiff;
+      var timeApex = (animTime-bounceApex)/(hitStart-bounceApex);
+      y = bounceHeight - bounceHeight * timeApex*timeApex;
+      ball.object.position.set(x,y,z);
+    } else if (animTime < hitEnd) {
+      // ball sinking into key
+      ball.object.position.copy(ball.end);
+      timeDiff = (animTime-hitStart)/(hitEnd-hitStart);
+      //if ( ball.object.visible ) {
+        //ball.object.visible = false;  // TODO - make key grow, ball sink, etc.
+      //}
+      ball.object.position.y = -timeDiff * ballRadius;
+      // still sinking
+      makeKeyGlow(ball.target);
     } else {
-      ball.cannon.position.y += ball.velocityUp;
-      ball.cannon.position.x += bounceOut;
+      // delete ball, we're at end of life
+      scene.remove(ball.object);
+      // remove ball from array
+      balls.splice(i, 1);
     }
   }
 }
@@ -292,21 +324,15 @@ function darkenKeys() {
 
 function resetTimer(songTime) {
   timeInSong = songTime;
-  lastUpdatedTime = Date.now();
+  localStartTime = Date.now();
 }
 
 function addControls() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
     controls.rotateSpeed = 1;
-    controls.zoomSpeed = 0.1;
+    controls.zoomSpeed = 1;
     controls.panSpeed = 1;
-
-    controls.noZoom = false;
-    controls.noPan = false;
-
-    controls.staticMoving = false;
-    controls.dynamicDampingFactor = 0.3;
 
     controls.minDistance = radius * 1.1;
     controls.maxDistance = radius * 25;
