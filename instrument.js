@@ -86,12 +86,12 @@ function init() {
   camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
   scene = new THREE.Scene();
   
-  sphereGeo = new THREE.SphereGeometry(ballRadius, 20, 10);
+  sphereGeo = new THREE.SphereBufferGeometry(ballRadius, 20, 10);
   sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
-  dropperGeo = new THREE.CylinderGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
+  dropperGeo = new THREE.CylinderBufferGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
   dropperMtl = sphereMtl;
-  whackerArmGeo = new THREE.CylinderGeometry(whackerRadius, whackerRadius, whackerArmHeight, 10, 1);
-  whackerPlateGeo = new THREE.CylinderGeometry(whackerPlateRadius, whackerPlateRadius, whackerPlateHeight, 30, 1);
+  whackerArmGeo = new THREE.CylinderBufferGeometry(whackerRadius, whackerRadius, whackerArmHeight, 10, 1);
+  whackerPlateGeo = new THREE.CylinderBufferGeometry(whackerPlateRadius, whackerPlateRadius, whackerPlateHeight, 30, 1);
 
   camera.position.x = -190;
   camera.position.y = 120;
@@ -153,7 +153,7 @@ function addDropper() {
   // cross bar
   var crossbarRadius = 0.3 * ballRadius;
   var crossbar = new THREE.Mesh(
-    new THREE.CylinderGeometry( crossbarRadius, crossbarRadius, numDroppers*dropperWidth, 10, 1),
+    new THREE.CylinderBufferGeometry( crossbarRadius, crossbarRadius, numDroppers*dropperWidth, 10, 1),
     dropperMtl
   );
   crossbar.position.set(0, dropperHeight + dropperPartHeight/2 - crossbarRadius, 0);
@@ -174,7 +174,7 @@ function addKeys() {
   for (var i = 0; i < numKeys; i++) {
     // 8 rows of 12 keys each, 4 at highest range
     var key = new THREE.Mesh(
-      new THREE.CubeGeometry(keyLength, keyThickness, keyWidth),
+      new THREE.BoxBufferGeometry(keyLength, keyThickness, keyWidth),
       new THREE.MeshPhongMaterial()
     );
 
