@@ -42,16 +42,20 @@ var dropperHeight = 100;
 var dropperPartHeight = 10;
 
 var whackerHeight = 30;
+var whackerRadius = 1;
+
+// top of parabola
 var bounceHeight = 70;
 
 var keys = [];
 var balls = [];
+var whackers = [];
 
 var ballHeadstart = 1730;
 var ballFadeDuration = 1730;
 
 var dropStart = -ballHeadstart;
-var dropEnd, bounceApex;
+var dropEnd, bounceApex, whackEnd;
 var hitStart = 0;
 var hitSunk = 0.4 * ballFadeDuration;
 var hitEnd = ballFadeDuration;
@@ -60,7 +64,7 @@ var timeInSong = -startDelay;
 var localStartTime;
 var prevNotesLength = 999999999;
 
-var sphereGeo, dropperGeo, dropperSphereGeo;
+var sphereGeo, dropperGeo, dropperSphereGeo, whackerArmGeo;
 var sphereMtl, dropperMtl;
 
 function init() {
@@ -79,6 +83,7 @@ function init() {
   var span3 = Math.sqrt(bounceHeight);
   var spanSum = span1 + span2 + span3;
   dropEnd = dropStart * (span2 + span3)/spanSum;
+  whackEnd = dropEnd/2;
   bounceApex = dropStart * span3/spanSum;
 
   // create a WebGL renderer, camera
@@ -91,6 +96,7 @@ function init() {
   sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
   dropperGeo = new THREE.CylinderGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
   dropperMtl = sphereMtl;
+  whackerArmGeo = new THREE.CylinderGeometry(whackerRadius, whackerRadius, whackerHeight, 8, 1);
 
   camera.position.x = -190;
   camera.position.y = 120;
@@ -263,6 +269,7 @@ function animate() {
   }
 
   moveBalls(currTime);
+  moveWhackers(currTime);
   darkenKeys(currTime);
 
   renderer.render(scene, camera);
@@ -303,6 +310,7 @@ function addBallsToMusic(t) {
     var keyID = notes[0].note - MIDI.pianoKeyOffset;
     if (notes[0].time + hitEnd > t ) {
       addBall(keyID, currentDropper, notes[0].time);
+      addWhacker(keyID, currentDropper, notes[0].time);
     } else {
       // note the ball's effect on the key
       extendKeyFully(keyID);
@@ -310,7 +318,7 @@ function addBallsToMusic(t) {
     // remove note from note list
     notes.splice(0, 1);
 
-    // add note ball at current dropper, in order
+    // note ball is added at current dropper, in order, then we increment
     // (if we know which finger is pressing the key, use that instead)
     currentDropper++;
     if ( currentDropper >= numDroppers ) {
@@ -321,6 +329,27 @@ function addBallsToMusic(t) {
       return;
     }
   }
+}
+
+function Whacker(keyTarget,dropper,t) {
+  this.target = keyTarget;
+  this.time = t;
+  this.arm = new THREE.Mesh(
+    whackerArmGeo,
+    sphereMtl
+  );
+  this.arm.position.y = -whackerHeight/2;
+  this.object = new THREE.Object3D();
+  this.object.add(this.arm);
+  this.object.position.set(0, 0, dropper * dropperWidth + dropperWidthOffset);
+}
+
+function addWhacker(keyTarget,dropper,t) {
+  var whacker = new Whacker(keyTarget,dropper,t);
+
+  whackers.push(whacker);
+
+  scene.add(whacker.object);
 }
 
 function extendKeyFraction(keyID,timeDiff)
@@ -375,6 +404,30 @@ function moveBalls(t) {
       scene.remove(ball.object);
       // remove ball from array
       balls.splice(i, 1);
+    }
+  }
+}
+
+function moveWhackers(t) {
+  var x,y,z, timeDiff;
+  for (var i = whackers.length - 1; i >= 0; i--) {
+    var whacker = whackers[i];
+    var animTime = t - whacker.time;
+
+    // compute location of ball in one of a few zones:
+    // 1) dropping from dropper: dropStart to dropEnd
+    // 2) bouncing from whacker: dropEnd to hitStart
+    // 3) sinking into key: hitStart to hitEnd
+    // 4) sunk, and key fading back to its normal color.
+    if (animTime < whackEnd) {
+      // spin the whacker
+      var angle = 2 * Math.PI * (animTime-dropStart)/(whackEnd-dropStart);
+      whacker.object.rotation.z = angle;
+    } else {
+      // delete whacker, we're at end of life
+      scene.remove(whacker.object);
+      // remove ball from array
+      whackers.splice(i, 1);
     }
   }
 }
