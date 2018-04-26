@@ -2,20 +2,6 @@
 
 var renderer, scene, camera, controls;
 
-var transitionColors = [
-  0xCC6600,
-  0xD17519,
-  0xD68533,
-  0xDB944D,
-  0xE0A366,
-  0xE6B280,
-  0xEBC299,
-  0xF0D1B2,
-  0xF5E0CC,
-  0xFAF0E6
-];
-
-var brassColor = transitionColors[0];
 var ballColor = 0xD4D4BF;
 
 var keyLength = 7;
@@ -42,7 +28,12 @@ var dropperHeight = 100;
 var dropperPartHeight = 10;
 
 var whackerHeight = 30;
-var whackerRadius = 1;
+var whackerRadius = 0.35 * ballRadius;
+var whackerPlateHeight = 0.5 * ballRadius;
+var whackerPlateRadius = 1.5 * ballRadius;
+// shorten real arm so that hit location is better against sphere's surface
+//var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sqrt(2);
+var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sqrt(2);
 
 // top of parabola
 var bounceHeight = 70;
@@ -64,8 +55,11 @@ var timeInSong = -startDelay;
 var localStartTime;
 var prevNotesLength = 999999999;
 
-var sphereGeo, dropperGeo, dropperSphereGeo, whackerArmGeo;
+var sphereGeo, dropperGeo, dropperSphereGeo, whackerArmGeo, whackerPlateGeo;
 var sphereMtl, dropperMtl;
+
+// when set true, animation no longer changes
+var debugFreezeFrame = false;
 
 function init() {
   var WIDTH = $('.rest').width() - 5,
@@ -83,7 +77,7 @@ function init() {
   var span3 = Math.sqrt(bounceHeight);
   var spanSum = span1 + span2 + span3;
   dropEnd = dropStart * (span2 + span3)/spanSum;
-  whackEnd = dropEnd/2;
+  whackEnd = dropStart - dropStart * 2 * span1/spanSum;
   bounceApex = dropStart * span3/spanSum;
 
   // create a WebGL renderer, camera
@@ -96,7 +90,8 @@ function init() {
   sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
   dropperGeo = new THREE.CylinderGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
   dropperMtl = sphereMtl;
-  whackerArmGeo = new THREE.CylinderGeometry(whackerRadius, whackerRadius, whackerHeight, 8, 1);
+  whackerArmGeo = new THREE.CylinderGeometry(whackerRadius, whackerRadius, whackerArmHeight, 10, 1);
+  whackerPlateGeo = new THREE.CylinderGeometry(whackerPlateRadius, whackerPlateRadius, whackerPlateHeight, 30, 1);
 
   camera.position.x = -190;
   camera.position.y = 120;
@@ -180,7 +175,7 @@ function addKeys() {
     // 8 rows of 12 keys each, 4 at highest range
     var key = new THREE.Mesh(
       new THREE.CubeGeometry(keyLength, keyThickness, keyWidth),
-      new THREE.MeshPhongMaterial({ color: brassColor })
+      new THREE.MeshPhongMaterial()
     );
 
     // bit lazy here, adding properties to the Mesh itself
@@ -264,13 +259,15 @@ function animate() {
   // currTime is how far into the song itself we are
   var currTime = timeInSong + timeFromStart;
 
-  if (musicPlaying) {
-    addBallsToMusic(currTime);
-  }
+  if ( !debugFreezeFrame ) {
+    if (musicPlaying) {
+      addBallsToMusic(currTime);
+    }
 
-  moveBalls(currTime);
-  moveWhackers(currTime);
-  darkenKeys(currTime);
+    moveBalls(currTime);
+    moveWhackers(currTime);
+    darkenKeys(currTime);
+  }
 
   renderer.render(scene, camera);
 
@@ -338,9 +335,18 @@ function Whacker(keyTarget,dropper,t) {
     whackerArmGeo,
     sphereMtl
   );
-  this.arm.position.y = -whackerHeight/2;
+  this.arm.position.y = -whackerArmHeight/2;
+
+  this.plate = new THREE.Mesh(
+    whackerPlateGeo,
+    sphereMtl
+  );
+  this.plate.position.y = -whackerArmHeight;
+  this.plate.rotation.z = Math.PI/4;
+  
   this.object = new THREE.Object3D();
   this.object.add(this.arm);
+  this.object.add(this.plate);
   this.object.position.set(0, 0, dropper * dropperWidth + dropperWidthOffset);
 }
 
@@ -423,6 +429,10 @@ function moveWhackers(t) {
       // spin the whacker
       var angle = 2 * Math.PI * (animTime-dropStart)/(whackEnd-dropStart);
       whacker.object.rotation.z = angle;
+      // show ball hitting plate
+      //if (animTime > dropEnd ) {
+      //  debugFreezeFrame = true;
+      //}
     } else {
       // delete whacker, we're at end of life
       scene.remove(whacker.object);
