@@ -36,38 +36,10 @@ var keyWidthOffset = -keyWidthSpacing * 5.5;
 
 var numKeys = 88;
 
-var keyRadius = 100;
-
-var bucketRadiusToCannon = 140;
-var bucketPositionOffset = 0.2;
-
-var bucketBaseRadius = 3;
-var bucketTopRadius = 5;
-var bucketHeight = 12;
-var bucketThickness = 1;
-
-var darkBaseRadius = bucketBaseRadius + 0.5;
-var darkBaseHeight = 1;
-var blackColor = 0x000000;
-
-var tubeRadius = 3;
-
-var numCentralizingPipes = 7;
-
 var ballRadius = 2;
 
-var ballHangtime = 100;
-var G = -0.1;
-
-var initVelocity = -G * ballHangtime / 2;
-var firingAngle = Math.acos(keyRadius / (ballHangtime * initVelocity));
-var velocityOut = Math.cos(firingAngle) * initVelocity;
-
-var bounceHangtime = 48;
-
-var bounceVelocity = -G * bounceHangtime / 2;
-var bounceAngle = Math.acos((bucketRadiusToCannon - keyRadius) / (bounceHangtime * bounceVelocity));
-var bounceOut   = Math.cos(bounceAngle) * bounceVelocity;
+// how much does a ball add to the height of a key?
+var scaleCount = ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*keyWidth);
 
 var currentDropper = 0;
 var numDroppers = 10;
@@ -82,7 +54,7 @@ var keys = [];
 var balls = [];
 
 var ballHeadstart = 1730;
-var ballFadeDuration = 300;
+var ballFadeDuration = 1730;
 
 var dropStart = -ballHeadstart;
 var dropEnd, bounceApex;
@@ -181,7 +153,12 @@ function addKeys() {
       new THREE.MeshPhongMaterial({ color: brassColor })
     );
 
+    // bit lazy here, adding properties to the Mesh itself
+    key.ballCount = 0;
+    key.frameBallCount = 0;
+
     keyPosition( i, key.position );
+    setKeyDepth(key);
 
     scene.add(key);
 
@@ -192,8 +169,7 @@ function addKeys() {
 function keyPosition(id, pos) {
   pos.x = parseInt( id / 12 ) * keyLengthSpacing + keyLengthOffset;
   pos.z = ( id % 12 ) * keyWidthSpacing + keyWidthOffset;
-  // put top of key at y == 0, for simplicity
-  pos.y = -keyThickness/2;
+  pos.y = 0;
 }
 
 function addHousing() {
@@ -248,10 +224,21 @@ function addBallsToMusic(t) {
   if (notes.length == 0)
     return;
 
-  while (notes[0].time < t + ballHeadstart) {
-    // TODO: test if ball time has passed - don't add it, if so; just remove note
-    addBall(notes[0].note - MIDI.pianoKeyOffset, currentDropper, notes[0].time);
+  // is note's playing time less the head start less that the current time
+  while (notes[0].time - ballHeadstart < t ) {
+    // if ball time has passed - don't add it, if so; just remove note
+    var keyID = notes[0].note - MIDI.pianoKeyOffset;
+    if (notes[0].time + ballFadeDuration > t ) {
+      addBall(keyID, currentDropper, notes[0].time);
+    } else {
+      // note the ball's effect on the key
+      extendKeyFully(keyID);
+    }
+    // remove note from note list
     notes.splice(0, 1);
+
+    // add note ball at current dropper, in order
+    // (if we know which finger is pressing the key, use that instead)
     currentDropper++;
     if ( currentDropper >= numDroppers ) {
       currentDropper = 0;
@@ -261,6 +248,18 @@ function addBallsToMusic(t) {
       return;
     }
   }
+}
+
+function extendKeyFraction(keyID,timeDiff)
+{
+  // the timeDiff is the height of the sphere,
+  // so add the volume related to the height.
+  keys[keyID].frameBallCount += 0.5*Math.cos((1-timeDiff)*Math.PI) + 0.5;
+}
+
+function extendKeyFully(keyID)
+{
+  keys[keyID].ballCount++;
 }
 
 function moveBalls(t) {
@@ -290,14 +289,13 @@ function moveBalls(t) {
       // ball sinking into key
       ball.object.position.copy(ball.end);
       timeDiff = (animTime-hitStart)/(hitEnd-hitStart);
-      //if ( ball.object.visible ) {
-        //ball.object.visible = false;  // TODO - make key grow, ball sink, etc.
-      //}
-      ball.object.position.y = -timeDiff * ballRadius;
+      ball.object.position.y = -timeDiff * 2 * ballRadius;
       // still sinking
       makeKeyGlow(ball.target);
+      extendKeyFraction(ball.target,timeDiff);
     } else {
       // delete ball, we're at end of life
+      extendKeyFully(ball.target);
       scene.remove(ball.object);
       // remove ball from array
       balls.splice(i, 1);
@@ -305,8 +303,14 @@ function moveBalls(t) {
   }
 }
 
-function makeKeyGlow(key) {
-  keys[key].material.color.setHex(transitionColors[transitionColors.length - 1]);
+function makeKeyGlow(keyID) {
+  keys[keyID].material.color.setHex(transitionColors[transitionColors.length - 1]);
+}
+
+function setKeyDepth(key) {
+  var heightAdjust = scaleCount * (key.ballCount + key.frameBallCount);
+  key.scale.y = heightAdjust+1;
+  key.position.y = -ballRadius - keyThickness/2 - heightAdjust;
 }
 
 function darkenKeys() {
@@ -319,6 +323,11 @@ function darkenKeys() {
     } else {
       key.material.color.setHex(transitionColors[state - 1]);
     }
+
+    // compute key height from fraction and full.
+    setKeyDepth(key);
+    // reset after each frame
+    key.frameBallCount = 0;
   }
 }
 
