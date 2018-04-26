@@ -17,15 +17,7 @@ var transitionColors = [
 
 var brassColor = transitionColors[0];
 var ballColor = 0xD4D4BF;
-var tubeColor = 0xD1D1D1;
 
-var cannonBaseRadius = 10;
-var cannonTopRadius = 15;
-var cannonThickness = 3;
-var cannonHeight = 40;
-
-var shortestKeyLength = 15;
-var longestKeyLength = 40;
 var keyLength = 7;
 var keyWidth = 5;
 var keyThickness = 2;
@@ -221,7 +213,7 @@ function addBall(keyTarget,dropper,t) {
 
 // add balls if time to do so
 function addBallsToMusic(t) {
-  if (notes.length == 0)
+  if (notes.length === 0)
     return;
 
   // is note's playing time less the head start less that the current time
