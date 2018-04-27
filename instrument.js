@@ -241,45 +241,19 @@ function addKeys() {
     key.lastTap = 0;
 
     // key "unhighlighted" color
-    switch( parseInt( i / 12 ) ) {
-      case 0:
-      key.r = 144; key.g = 25; key.b = 255;
-      break;
-      case 1:
-      key.r = 25; key.g = 79; key.b = 255;
-      break;
-      case 2:
-      key.r = 25; key.g = 252; key.b = 255;
-      break;
-      case 3:
-      key.r = 25; key.g = 255; key.b = 85;
-      break;
-      case 4:
-      key.r = 139; key.g = 255; key.b = 25;
-      break;
-      case 5:
-      key.r = 255; key.g = 198; key.b = 25;
-      break;
-      case 6:
-      key.r = 255; key.g = 25; key.b = 25;
-      break;
-      case 7:
-      key.r = 255; key.g = 25; key.b = 193;
-      break;
-    }
-    key.r /= 255;
-    key.g /= 255;
-    key.b /= 255;
     // is it a black key? darken
+    var blackScale = 0.5;
     var keyType = i % 12;
     if ( keyType === 1 || keyType === 4 || keyType === 6 || keyType === 9 || keyType === 11 ) {
       // not gamma corrected, but so be it.
-      var blackScale = 0.4;
-      key.r *= blackScale;
-      key.g *= blackScale;
-      key.b *= blackScale;
+      blackScale *= 0.4;
     }
-    key.material.color.setRGB(key.r, key.g, key.b);
+
+    // play with .75 to cycle the colors (could even animate it)
+    key.material.color.setHSL((1.75-parseInt( i / 12 )/8)%1, 1, blackScale );
+    key.r = key.material.color.r;
+    key.g = key.material.color.g;
+    key.b = key.material.color.b;
     //key.castShadow = true;  // doesn't cast shadows on anything, so not needed
     key.receiveShadow = true;
 
