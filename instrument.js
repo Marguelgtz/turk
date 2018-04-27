@@ -143,6 +143,7 @@ function onWindowResize() {
 
 function addControls() {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.screenSpacePanning = true;
   controls.rotateSpeed = 3;
   controls.zoomSpeed = 1;
   controls.panSpeed = 1;
