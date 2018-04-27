@@ -125,10 +125,18 @@ function init() {
 
   controls.target.set( (keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0.8*housingOuterRadius, 0 );
 
-  fillScene();
+  window.addEventListener( 'resize', onWindowResize, false );
 
-  // draw!
-  renderer.render(scene, camera);
+  fillScene();
+}
+
+function onWindowResize() {
+
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize( window.innerWidth, window.innerHeight );
+
 }
 
 function addControls() {
@@ -616,7 +624,7 @@ function resetTimer(songTime) {
 }
 
 function animate() {
-  // hack - better would be to get a signal from when the music player plays TODO
+  // hack - better would be to get a signal from when the music player plays
   if ( prevNotesLength !== notes.length ) {
     newTune();
   }
