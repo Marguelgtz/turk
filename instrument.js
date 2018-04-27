@@ -4,11 +4,11 @@ var renderer, scene, camera, controls;
 
 var ballColor = 0xD4D4BF;
 
-var keyLength = 7;
+var keyLength = 12;
 var keyWidth = 5;
 var keyThickness = 2;
 var keyLengthSpacing = -keyLength - 4;
-var keyLengthOffset = -150;
+var keyLengthOffset = -70;
 var keyWidthSpacing = keyWidth + 4;
 var keyWidthOffset = -keyWidthSpacing * 5.5;
 
@@ -26,6 +26,7 @@ var dropperRadius = 1.5 * ballRadius;
 var dropperWidthOffset = -dropperWidth * (numDroppers-1) / 2;
 var dropperHeight = 100;
 var dropperPartHeight = 10;
+var crossbarRadius = 0.3 * ballRadius;
 
 var whackerHeight = 30;
 var whackerRadius = 0.35 * ballRadius;
@@ -34,6 +35,12 @@ var whackerPlateRadius = 1.5 * ballRadius;
 // shorten real arm so that hit location is better against sphere's surface
 //var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sqrt(2);
 var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sqrt(2);
+
+var housingThickness = 1;
+var housingInnerRadius = whackerHeight + 3;
+var housingOuterRadius = housingInnerRadius + housingThickness;
+var housingWidth = numDroppers * dropperWidth + 8;
+var spindleRadius = 0.3 * ballRadius;
 
 // top of parabola
 var bounceHeight = 70;
@@ -151,7 +158,6 @@ function addLighting() {
 
 function addDropper() {
   // cross bar
-  var crossbarRadius = 0.3 * ballRadius;
   var crossbar = new THREE.Mesh(
     new THREE.CylinderBufferGeometry( crossbarRadius, crossbarRadius, numDroppers*dropperWidth, 10, 1),
     dropperMtl
@@ -240,6 +246,47 @@ function keyPosition(id, pos) {
 }
 
 function addHousing() {
+  //var housingInnerRadius = whackerHeight + 4;
+  //var housingOuterRadius = housingInnerRadius + housingThickness;
+  //var housingWidth = numDroppers * dropperWidth + 8;
+  //var housingThickness = 4;
+  var housing = new THREE.Mesh(
+    // inner radius top, bottom, outer radius top, bottom, inner height, outer height,
+    // radial segments, height segments, open-ended boolean, end segments (bevel), range angle, function [not set]
+    new PipeGeometry(housingInnerRadius, housingInnerRadius, housingOuterRadius, housingOuterRadius, housingWidth, housingWidth,
+      36, 1, false, 1, 1.5 * Math.PI),
+    dropperMtl
+  );
+  housing.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
+  scene.add(housing);
+
+  var housingCapGeo = new PipeGeometry(spindleRadius/2, spindleRadius/2, housingOuterRadius, housingOuterRadius, housingThickness, housingThickness,
+    36, 1, false, 1, 1.5 * Math.PI);
+
+  var housingCap1 = new THREE.Mesh(
+    // inner radius top, bottom, outer radius top, bottom, inner height, outer height,
+    // radial segments, height segments, open-ended boolean, end segments (bevel), range angle, function [not set]
+    housingCapGeo, dropperMtl
+  );
+  housingCap1.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
+  housingCap1.position.set(0,0,(housingWidth+housingThickness)/2);
+  scene.add(housingCap1);
+  
+  var housingCap2 = new THREE.Mesh(
+    // inner radius top, bottom, outer radius top, bottom, inner height, outer height,
+    // radial segments, height segments, open-ended boolean, end segments (bevel), range angle, function [not set]
+    housingCapGeo, dropperMtl
+  );
+  housingCap2.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
+  housingCap2.position.set(0,0,-(housingWidth+housingThickness)/2);
+  scene.add(housingCap2);
+  
+  var spindle = new THREE.Mesh(
+    new THREE.CylinderBufferGeometry( spindleRadius, spindleRadius, housingWidth + 4*housingThickness, 10, 1),
+    dropperMtl
+  );
+  spindle.rotation.set(Math.PI/2, 0, 0);
+  scene.add(spindle);
 }
 
 function animate() {
@@ -455,6 +502,15 @@ function clearBalls() {
   }
 }
 
+function clearWhackers() {
+  for (var i = whackers.length - 1; i >= 0; i--) {
+    var whacker = whackers[i];
+    scene.remove(whacker.object);
+    // remove whacker from array
+    whackers.splice(i, 1);
+  }
+}
+
 function setKeyDepth(key) {
   var heightAdjust = scaleCount * (key.ballCount + key.frameBallCount);
   key.scale.y = heightAdjust+1;
@@ -500,6 +556,7 @@ function resetKeyCounts() {
 
 function newTune() {
   clearBalls();
+  clearWhackers();
   resetKeyCounts();
   darkenKeys(0);
 }
