@@ -21,7 +21,7 @@ function switchTo(file) {
   $('#current-song').text('Currently Playing: ' + songName);
 
   xmlhttp = new XMLHttpRequest();
-  xmlhttp.open("GET", file, false);
+  xmlhttp.open("GET", file, false); // immoral, https://xhr.spec.whatwg.org/, but beats me what to do
   xmlhttp.send(null);
   var fileContent = xmlhttp.responseText;
 

@@ -79,8 +79,6 @@ function init() {
       NEAR = 0.1,
       FAR = 10000;
 
-  console.log('Size: ' + WIDTH + ' ' + HEIGHT);
-
   // Determine how much time is spent falling, bouncing up, and bouncing down
   var span1 = Math.sqrt(dropperHeight - whackerHeight);
   var span2 = Math.sqrt(bounceHeight - whackerHeight);
@@ -493,7 +491,10 @@ function moveBalls(t) {
       x = ball.start.x + (ball.end.x-ball.start.x) * timeDiff;
       z = ball.start.z + (ball.end.z-ball.start.z) * timeDiff;
       var timeApex = (animTime-bounceApex)/(hitStart-bounceApex);
-      y = bounceHeight - bounceHeight * timeApex*timeApex;
+      // avoid balls colliding by varying height a bit; also more visually interesting
+      var hashrand = ((ball.time + ball.target * 14029)%88)/87;
+      var localBounceHeight = bounceHeight + hashrand * 12 - 4;
+      y = localBounceHeight - localBounceHeight * timeApex*timeApex;
       ball.object.position.set(x,y,z);
     } else if (animTime < hitSunk) {
       // ball sinking into key
