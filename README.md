@@ -3,10 +3,10 @@
 
 An Animusic-inspired machine that plays classical music with ball bearings, sort of, and shows a summary of the notes played.
 
-[![Screenshot](http://i.imgur.com/jUGLlQ5.png)](http://ulyssecarion.github.io/turk)
+[![Screenshot](http://erich.realtimerendering.com/datanimusic/screenshot.png)](https://github.com/erich666/turk)
 
 Inspired by the Animusic video "Pipe Dream" ([watch it on YouTube](http://www.youtube.com/watch?v=hyCIpKAIFyo)) and [Euphony](https://github.com/qiao/euphony) by [Xueqiao Xu](https://github.com/qiao).
-Built atop the [Musical Turk](http://ulyssecarion.github.io/turk) framework by [Ulysse Carion](http://ulyssecarion.github.io).
+Built atop the [Musical Turk](http://ulysse.io/turk) framework by [Ulysse Carion](http://ulysse.io).
 
 Made with help from:
 
