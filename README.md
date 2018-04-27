@@ -1,11 +1,12 @@
-[The Musical Turk](http://ulyssecarion.github.io/turk)
+[Datanimusic](https://github.com/erich666/turk)
 ====
 
-An Animusic-inspired machine that plays classical music with marbles.
+An Animusic-inspired machine that plays classical music with ball bearings, sort of, and shows a summary of the notes played.
 
 [![Screenshot](http://i.imgur.com/jUGLlQ5.png)](http://ulyssecarion.github.io/turk)
 
-Inspired by the viral Animusic video "Pipe Dream" ([watch it on YouTube](http://www.youtube.com/watch?v=hyCIpKAIFyo)) and [Euphony](https://github.com/qiao/euphony) by Xueqiao Xu ([qiao](https://github.com/qiao)).
+Inspired by the Animusic video "Pipe Dream" ([watch it on YouTube](http://www.youtube.com/watch?v=hyCIpKAIFyo)) and [Euphony](https://github.com/qiao/euphony) by [Xueqiao Xu](https://github.com/qiao).
+Built atop the [Musical Turk](http://ulyssecarion.github.io/turk) framework by [Ulysse Carion](http://ulyssecarion.github.io).
 
 Made with help from:
 
@@ -15,8 +16,8 @@ Made with help from:
 * [jQuery](http://jquery.com)
 * [bootstrap](http://twitter.github.com/bootstrap)
 
-A lot of the code and _all_ of the pieces are from [Euphony](https://github.com/qiao/euphony). So you should seriously check that out if haven't done so already.
+and a lot of the code and _all_ of the pieces are from [Euphony](https://github.com/qiao/euphony).
 
-The TubeGeometry used is by Muhamamd Mobeen Movania. Thanks to Eric Haines and Yann Granjon for recommending that I use a TubeGeometry from Udacity.
+The PipeGeometry is an update of the [TubeGeometry code](https://github.com/Troilk/cs291-contest) by [Vitalii Maslikov](https://github.com/Troilk).
 
-Sadly, because it requires high-precision MIDI playing, this demo only works in Chrome. In addition, it requires WebGL and doesn't seem to work on older computers.
+Because it requires high-precision MIDI playing, this demo is usually best with Chrome. Even then, you may get hesitations. When you change music, you may also need to hit "reload."
