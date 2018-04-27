@@ -151,7 +151,7 @@ function addControls() {
   //controls.minDistance = radius * 0.1;
   //controls.maxDistance = radius * 25;
 
-  controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
+  //controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
 }
 
 function fillScene() {
