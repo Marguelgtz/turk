@@ -70,6 +70,8 @@ var ballMtl, dropperMtl, whackerMtl, whackerPlateMtl;
 
 // when set true, animation no longer changes
 var debugFreezeFrame = false;
+// look for time jump
+//var debugPrevTime = 0;
 
 function init() {
   var WIDTH = $('.rest').width() - 5,
@@ -78,6 +80,8 @@ function init() {
       ASPECT = WIDTH / HEIGHT,
       NEAR = 0.1,
       FAR = 10000;
+
+  //console.log('Size: ' + WIDTH + ' ' + HEIGHT);
 
   // Determine how much time is spent falling, bouncing up, and bouncing down
   var span1 = Math.sqrt(dropperHeight - whackerHeight);
@@ -642,6 +646,11 @@ function animate() {
   var currTime = timeInSong + timeFromStart;
 
   if ( !debugFreezeFrame ) {
+
+    // ugh - sometimes there are jumps backwards in time, causing weirdness with the animation TODO
+    //if ( debugPrevTime > currTime ) {
+    //  console.log(" TIME JUMP " + debugPrevTime + " to " + currTime );
+    //}
     if (musicPlaying) {
       addBallsToMusic(currTime);
     }
@@ -649,6 +658,7 @@ function animate() {
     moveBalls(currTime);
     moveWhackers(currTime);
     darkenKeys(currTime);
+    //debugPrevTime = currTime;
   }
 
   renderer.render(scene, camera);
