@@ -3,6 +3,10 @@
 var renderer, scene, camera, controls;
 
 var ballColor = 0xD4D4BF;
+var dropperColor = 0xD4D4BF;
+var whackerColor = 0xA2A2A2;
+var whackerPlateColor = 0xDEC600;
+var housingColor = 0xFF7733;
 
 var keyLength = 12;
 var keyWidth = 5;
@@ -39,6 +43,7 @@ var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sq
 var housingThickness = 1;
 var housingInnerRadius = whackerHeight + 3;
 var housingOuterRadius = housingInnerRadius + housingThickness;
+var housingCapOuterRadius = housingOuterRadius + housingThickness/2;
 var housingWidth = numDroppers * dropperWidth + 8;
 var spindleRadius = 0.3 * ballRadius;
 
@@ -62,8 +67,8 @@ var timeInSong = -startDelay;
 var localStartTime;
 var prevNotesLength = 999999999;
 
-var sphereGeo, dropperGeo, dropperSphereGeo, whackerArmGeo, whackerPlateGeo;
-var sphereMtl, dropperMtl;
+var ballGeo, dropperGeo, whackerArmGeo, whackerPlateGeo;
+var ballMtl, dropperMtl, whackerMtl, whackerPlateMtl;
 
 // when set true, animation no longer changes
 var debugFreezeFrame = false;
@@ -93,20 +98,24 @@ function init() {
   camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
   scene = new THREE.Scene();
   
-  sphereGeo = new THREE.SphereBufferGeometry(ballRadius, 20, 10);
-  sphereMtl = new THREE.MeshPhongMaterial({ color: ballColor });
+  ballGeo = new THREE.SphereBufferGeometry(ballRadius, 20, 10);
+  ballMtl = new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.5, metalness: 0.5 });
   dropperGeo = new THREE.CylinderBufferGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
-  dropperMtl = sphereMtl;
+  dropperMtl =new THREE.MeshPhysicalMaterial({ color: dropperColor });
   whackerArmGeo = new THREE.CylinderBufferGeometry(whackerRadius, whackerRadius, whackerArmHeight, 10, 1);
   whackerPlateGeo = new THREE.CylinderBufferGeometry(whackerPlateRadius, whackerPlateRadius, whackerPlateHeight, 30, 1);
+  whackerMtl =new THREE.MeshPhysicalMaterial({ color: whackerColor });
+  whackerPlateMtl =new THREE.MeshPhysicalMaterial({ color: whackerPlateColor, roughness: 0.64, metalness: 0.67 });
 
-  camera.position.x = -190;
-  camera.position.y = 120;
+  camera.position.x = -210;
+  camera.position.y = 150;
   camera.position.z = 170;
-  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  //camera.lookAt(new THREE.Vector3(0, 0, 0));
 
   // start the renderer
   renderer.setSize(WIDTH, HEIGHT);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.BasicShadowMap;
 
   // attach the render-supplied DOM element
   $('#turk').append(renderer.domElement);
@@ -116,8 +125,25 @@ function init() {
 
   addControls();
 
+  controls.target.set( (keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0.8*housingOuterRadius, 0 );
+
+  fillScene();
+
   // draw!
   renderer.render(scene, camera);
+}
+
+function addControls() {
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
+  controls.rotateSpeed = 3;
+  controls.zoomSpeed = 1;
+  controls.panSpeed = 1;
+
+  //controls.minDistance = radius * 0.1;
+  //controls.maxDistance = radius * 25;
+
+  controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
 }
 
 function fillScene() {
@@ -131,27 +157,40 @@ function fillScene() {
 }
 
 function addLighting() {
-  var light1 = new THREE.DirectionalLight(0xFFFFFF);
+  var dirLight = new THREE.DirectionalLight( 0xeeeeee, 1 );
+  dirLight.name = 'Dir. Light';
+  dirLight.position.set( 0, dropperHeight+dropperPartHeight+1, 0 );
+  dirLight.castShadow = true;
+  dirLight.shadow.camera.near = 0;
+  dirLight.shadow.camera.far = dropperHeight+dropperPartHeight+housingCapOuterRadius + 2;
+  dirLight.shadow.camera.right = housingCapOuterRadius + 1;
+  dirLight.shadow.camera.left = keyLengthOffset + keyLengthSpacing*7 - keyLength/2 - 1;
+  // actually left, looking down keys at housing
+  // measurement assumes housing is wider than the set of keys
+  dirLight.shadow.camera.top	= housingWidth/2 + housingThickness + 1;
+  dirLight.shadow.camera.bottom = -dirLight.shadow.camera.top;
+  dirLight.shadow.mapSize.width = 3000;
+  // make height proportional to width so that shadow pixels are "square"
+  dirLight.shadow.mapSize.height = parseInt(dirLight.shadow.mapSize.width *
+    (dirLight.shadow.camera.top-dirLight.shadow.camera.bottom)/(dirLight.shadow.camera.right-dirLight.shadow.camera.left));
+  scene.add( dirLight );
 
-  light1.position.x = 0;
-  light1.position.y = 500;
-  light1.position.z = 0;
-
-  scene.add(light1);
+  // debug aid: shows light's camera bounds.
+  //scene.add( new THREE.CameraHelper( dirLight.shadow.camera ) );
 
   var light2 = new THREE.DirectionalLight(0xbbbbbb);
 
   light2.position.x = 200;
-  light2.position.y = -200;
+  light2.position.y = 200;
   light2.position.z = -500;
 
   scene.add(light2);
 
-  var light3 = new THREE.DirectionalLight(0xbbbbbb);
+  var light3 = new THREE.DirectionalLight(0xeeeeee);
 
-  light3.position.x = -300;
-  light3.position.y = -300;
-  light3.position.z = 400;
+  light3.position.x = -400;
+  light3.position.y = -200;
+  light3.position.z = 300;
 
   scene.add(light3);
 }
@@ -164,6 +203,8 @@ function addDropper() {
   );
   crossbar.position.set(0, dropperHeight + dropperPartHeight/2 - crossbarRadius, 0);
   crossbar.rotation.set(Math.PI/2, 0, 0);
+  //crossbar.castShadow = true;
+  //crossbar.receiveShadow = true;
   scene.add(crossbar);
 
   for (var i = 0; i < numDroppers; i++) {
@@ -172,6 +213,8 @@ function addDropper() {
       dropperMtl
     );
     dropper.position.set(0, dropperHeight, i * dropperWidth + dropperWidthOffset);
+    //dropper.castShadow = true;
+    //dropper.receiveShadow = true;
     scene.add(dropper);
   }
 }
@@ -181,7 +224,7 @@ function addKeys() {
     // 8 rows of 12 keys each, 4 at highest range
     var key = new THREE.Mesh(
       new THREE.BoxBufferGeometry(keyLength, keyThickness, keyWidth),
-      new THREE.MeshPhongMaterial()
+      new THREE.MeshPhysicalMaterial( {roughness: 1.0} )
     );
 
     // bit lazy here, adding properties to the Mesh itself
@@ -223,12 +266,14 @@ function addKeys() {
     var keyType = i % 12;
     if ( keyType === 1 || keyType === 4 || keyType === 6 || keyType === 9 || keyType === 11 ) {
       // not gamma corrected, but so be it.
-      var blackScale = 0.6;
+      var blackScale = 0.4;
       key.r *= blackScale;
       key.g *= blackScale;
       key.b *= blackScale;
     }
     key.material.color.setRGB(key.r, key.g, key.b);
+    //key.castShadow = true;  // doesn't cast shadows on anything, so not needed
+    key.receiveShadow = true;
 
     keyPosition( i, key.position );
     setKeyDepth(key);
@@ -246,79 +291,53 @@ function keyPosition(id, pos) {
 }
 
 function addHousing() {
-  //var housingInnerRadius = whackerHeight + 4;
-  //var housingOuterRadius = housingInnerRadius + housingThickness;
-  //var housingWidth = numDroppers * dropperWidth + 8;
-  //var housingThickness = 4;
+  var housingMtl = new THREE.MeshPhysicalMaterial({ color: housingColor, roughness: 0.64, metalness: 0.67 });
+
   var housing = new THREE.Mesh(
     // inner radius top, bottom, outer radius top, bottom, inner height, outer height,
     // radial segments, height segments, open-ended boolean, end segments (bevel), range angle, function [not set]
     new PipeGeometry(housingInnerRadius, housingInnerRadius, housingOuterRadius, housingOuterRadius, housingWidth, housingWidth,
       36, 1, false, 1, 1.5 * Math.PI),
-    dropperMtl
+    housingMtl
   );
   housing.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
+  //housing.castShadow = true;
+  housing.receiveShadow = true;
   scene.add(housing);
 
-  var housingCapGeo = new PipeGeometry(spindleRadius/2, spindleRadius/2, housingOuterRadius, housingOuterRadius, housingThickness, housingThickness,
+  var housingCapGeo = new PipeGeometry(spindleRadius/2, spindleRadius/2, housingCapOuterRadius, housingCapOuterRadius, housingThickness, housingThickness,
     36, 1, false, 1, 1.5 * Math.PI);
 
   var housingCap1 = new THREE.Mesh(
     // inner radius top, bottom, outer radius top, bottom, inner height, outer height,
     // radial segments, height segments, open-ended boolean, end segments (bevel), range angle, function [not set]
-    housingCapGeo, dropperMtl
+    housingCapGeo, housingMtl
   );
   housingCap1.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
   housingCap1.position.set(0,0,(housingWidth+housingThickness)/2);
+  //housingCap1.castShadow = true;
+  housingCap1.receiveShadow = true;
   scene.add(housingCap1);
   
   var housingCap2 = new THREE.Mesh(
     // inner radius top, bottom, outer radius top, bottom, inner height, outer height,
     // radial segments, height segments, open-ended boolean, end segments (bevel), range angle, function [not set]
-    housingCapGeo, dropperMtl
+    housingCapGeo, housingMtl
   );
   housingCap2.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
   housingCap2.position.set(0,0,-(housingWidth+housingThickness)/2);
+  //housingCap2.castShadow = true;
+  housingCap2.receiveShadow = true;
   scene.add(housingCap2);
   
   var spindle = new THREE.Mesh(
     new THREE.CylinderBufferGeometry( spindleRadius, spindleRadius, housingWidth + 4*housingThickness, 10, 1),
-    dropperMtl
+    whackerMtl
   );
   spindle.rotation.set(Math.PI/2, 0, 0);
+  spindle.castShadow = true;
+  spindle.receiveShadow = true;
   scene.add(spindle);
-}
-
-function animate() {
-  // hack - better would be to get a signal from when the music player plays TODO
-  if ( prevNotesLength !== notes.length ) {
-    newTune();
-  }
-  requestAnimationFrame(animate);
-
-  controls.update();
-
-  // first time called, establish what time it is when the song starts
-  localStartTime = localStartTime || Date.now();
-  
-  var timeFromStart = Date.now() - localStartTime;
-  
-  // currTime is how far into the song itself we are
-  var currTime = timeInSong + timeFromStart;
-
-  if ( !debugFreezeFrame ) {
-    if (musicPlaying) {
-      addBallsToMusic(currTime);
-    }
-
-    moveBalls(currTime);
-    moveWhackers(currTime);
-    darkenKeys(currTime);
-  }
-
-  renderer.render(scene, camera);
-
-  prevNotesLength = notes.length;
 }
 
 function Ball(keyTarget,dropper,t) {
@@ -329,10 +348,13 @@ function Ball(keyTarget,dropper,t) {
   this.time = t;
   this.hit = false;
   this.object = new THREE.Mesh(
-    sphereGeo,
-    sphereMtl
+    ballGeo,
+    ballMtl
   );
   this.object.position.copy( this.start );
+  this.object.castShadow = true;
+  // receiving can look bad, see debugFreezeFrame t=5000 for Flight of the Bumblebees, I think it's a bias bug?
+  //this.object.receiveShadow = true;
 }
 
 function addBall(keyTarget,dropper,t) {
@@ -380,16 +402,22 @@ function Whacker(keyTarget,dropper,t) {
   this.time = t;
   this.arm = new THREE.Mesh(
     whackerArmGeo,
-    sphereMtl
+    whackerMtl
   );
   this.arm.position.y = -whackerArmHeight/2;
+  this.arm.castShadow = true;
+  // having these receive shadows is distracting, IMO
+  //this.arm.receiveShadow = true;
 
   this.plate = new THREE.Mesh(
     whackerPlateGeo,
-    sphereMtl
+    whackerPlateMtl
   );
   this.plate.position.y = -whackerArmHeight;
   this.plate.rotation.z = Math.PI/4;
+  this.plate.scale.x = 1.5;
+  this.plate.castShadow = true;
+  this.plate.receiveShadow = true;
   
   this.object = new THREE.Object3D();
   this.object.add(this.arm);
@@ -444,6 +472,8 @@ function moveBalls(t) {
     } else if (animTime < hitSunk) {
       // ball sinking into key
       ball.object.position.copy(ball.end);
+      // when sinking, it's nice to turn off the shadow
+      ball.object.castShadow = false;
       timeDiff = (animTime-hitStart)/(hitSunk-hitStart);
       // simple sink:
       ball.object.position.y = -timeDiff * 2 * ballRadius;
@@ -482,6 +512,8 @@ function moveWhackers(t) {
       whacker.object.rotation.z = angle;
       // show ball hitting plate
       //if (animTime > dropEnd ) {
+      // freeze at a given moment
+      //if ( t > 5000 ) {
       //  debugFreezeFrame = true;
       //}
     } else {
@@ -566,19 +598,37 @@ function resetTimer(songTime) {
   localStartTime = Date.now();
 }
 
-function addControls() {
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
-    controls.rotateSpeed = 3;
-    controls.zoomSpeed = 1;
-    controls.panSpeed = 1;
+function animate() {
+  // hack - better would be to get a signal from when the music player plays TODO
+  if ( prevNotesLength !== notes.length ) {
+    newTune();
+  }
+  requestAnimationFrame(animate);
 
-    //controls.minDistance = radius * 0.1;
-    //controls.maxDistance = radius * 25;
+  controls.update();
 
-    controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
+  // first time called, establish what time it is when the song starts
+  localStartTime = localStartTime || Date.now();
+  
+  var timeFromStart = Date.now() - localStartTime;
+  
+  // currTime is how far into the song itself we are
+  var currTime = timeInSong + timeFromStart;
+
+  if ( !debugFreezeFrame ) {
+    if (musicPlaying) {
+      addBallsToMusic(currTime);
+    }
+
+    moveBalls(currTime);
+    moveWhackers(currTime);
+    darkenKeys(currTime);
+  }
+
+  renderer.render(scene, camera);
+
+  prevNotesLength = notes.length;
 }
 
 init();
-fillScene();
 animate();
