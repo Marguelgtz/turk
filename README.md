@@ -1,7 +1,9 @@
 [Datanimusic](https://github.com/erich666/turk)
 ====
 
-An Animusic-inspired machine that plays classical music with ball bearings, sort of, and shows a summary of the notes played.
+An Animusic-inspired machine that plays classical music with ball bearings, and shows a summary of the notes played.
+
+[Run demo run](https://bit.ly/datanimusic).
 
 [![Screenshot](http://erich.realtimerendering.com/datanimusic/screenshot.png)](https://github.com/erich666/turk)
 
