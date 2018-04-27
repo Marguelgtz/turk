@@ -36,9 +36,7 @@ var whackerHeight = 30;
 var whackerRadius = 0.35 * ballRadius;
 var whackerPlateHeight = 0.5 * ballRadius;
 var whackerPlateRadius = 1.5 * ballRadius;
-// shorten real arm so that hit location is better against sphere's surface
-//var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sqrt(2);
-var whackerArmHeight = whackerHeight - (ballRadius+whackerPlateHeight/2)*Math.sqrt(2);
+var whackerArmHeight = whackerHeight;
 
 var housingThickness = 1;
 var housingInnerRadius = whackerHeight + 3;
@@ -135,11 +133,11 @@ function init() {
 
 function addControls() {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
-  var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
   controls.rotateSpeed = 3;
   controls.zoomSpeed = 1;
   controls.panSpeed = 1;
 
+  //var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
   //controls.minDistance = radius * 0.1;
   //controls.maxDistance = radius * 25;
 
@@ -342,6 +340,7 @@ function addHousing() {
 
 function Ball(keyTarget,dropper,t) {
   this.target = keyTarget;
+  //this.dropper = dropper;
   this.start = new THREE.Vector3(0, dropperHeight, dropper * dropperWidth + dropperWidthOffset);
   this.end = new THREE.Vector3();
   keyPosition( keyTarget, this.end );
@@ -374,6 +373,11 @@ function addBallsToMusic(t) {
   while (notes[0].time - ballHeadstart < t ) {
     // if ball time has passed - don't add it, if so; just remove note
     var keyID = notes[0].note - MIDI.pianoKeyOffset;
+
+    // debug: to force a particular octave, e.g. the highest, 7*12
+    //keyID = 7*12 + keyID % 12;
+    //keyID = keyID % 12;
+
     if (notes[0].time + hitEnd > t ) {
       addBall(keyID, currentDropper, notes[0].time);
       addWhacker(keyID, currentDropper, notes[0].time);
@@ -398,13 +402,26 @@ function addBallsToMusic(t) {
 }
 
 function Whacker(keyTarget,dropper,t) {
+  // take direction to end point and come up with half angle and azimuth, more or less
+  var z = parseInt(keyTarget/12);
+  var zrot = Math.PI/24 + z * 3*Math.PI/(7*24);
+
+  // shorten real arm so that hit location is better against sphere's surface
+  var adjustedWhackerHeight = whackerArmHeight - (ballRadius+whackerPlateHeight/2)/Math.cos(zrot);
+
+  var vec = new THREE.Vector3();
+  keyPosition( keyTarget, vec );
+  vec.z -= dropper * dropperWidth + dropperWidthOffset;
+
   this.target = keyTarget;
+  this.dropper = dropper; // only used for debugging
   this.time = t;
   this.arm = new THREE.Mesh(
     whackerArmGeo,
     whackerMtl
   );
-  this.arm.position.y = -whackerArmHeight/2;
+  this.arm.position.y = -adjustedWhackerHeight/2;
+  this.arm.scale.y = adjustedWhackerHeight / whackerHeight;
   this.arm.castShadow = true;
   // having these receive shadows is distracting, IMO
   //this.arm.receiveShadow = true;
@@ -413,9 +430,10 @@ function Whacker(keyTarget,dropper,t) {
     whackerPlateGeo,
     whackerPlateMtl
   );
-  this.plate.position.y = -whackerArmHeight;
-  this.plate.rotation.z = Math.PI/4;
-  this.plate.scale.x = 1.5;
+  this.plate.position.y = -adjustedWhackerHeight;
+  this.plate.rotation.z = zrot;
+  this.plate.rotation.x = -Math.atan2(vec.z,-vec.x)/2;
+  this.plate.scale.x = 2.0;
   this.plate.castShadow = true;
   this.plate.receiveShadow = true;
   
@@ -496,7 +514,6 @@ function moveBalls(t) {
 }
 
 function moveWhackers(t) {
-  var x,y,z, timeDiff;
   for (var i = whackers.length - 1; i >= 0; i--) {
     var whacker = whackers[i];
     var animTime = t - whacker.time;
@@ -510,10 +527,10 @@ function moveWhackers(t) {
       // spin the whacker
       var angle = 2 * Math.PI * (animTime-dropStart)/(whackEnd-dropStart);
       whacker.object.rotation.z = angle;
-      // show ball hitting plate
-      //if (animTime > dropEnd ) {
+      // show ball hitting plate for a given dropper location
+      //if (animTime > dropEnd && whacker.dropper === 4) {
       // freeze at a given moment
-      //if ( t > 5000 ) {
+      //if ( t > 2000 ) {
       //  debugFreezeFrame = true;
       //}
     } else {

@@ -1,4 +1,4 @@
-var startDelay = 3000;
+var startDelay = 6000;
 
 var notes = [];
 var start;
