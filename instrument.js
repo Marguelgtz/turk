@@ -454,13 +454,19 @@ function moveBalls(t) {
     var ball = balls[i];
     var animTime = t - ball.time;
 
+    // case 0: sometimes the clock gets set back when syncing, so avoid
+    // this case by keeping the ball in place.
+    if (animTime < dropStart ) {
+      animTime = dropStart;
+    }
+
     // compute location of ball in one of a few zones:
     // 1) dropping from dropper: dropStart to dropEnd
     // 2) bouncing from whacker: dropEnd to hitStart
     // 3) sinking into key: hitStart to hitEnd
     // 4) sunk, and key fading back to its normal color.
     if (animTime < dropEnd) {
-      // dropping from dropper
+        // dropping from dropper
       timeDiff = (animTime-dropStart)/(dropEnd-dropStart);
       y = dropperHeight - (dropperHeight-whackerHeight) * timeDiff*timeDiff;
       ball.object.position.set(ball.start.x,y,ball.start.z);
