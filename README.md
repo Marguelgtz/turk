@@ -5,7 +5,7 @@ An Animusic-inspired machine that plays classical music with ball bearings, and 
 
 [Run the demo](https://bit.ly/datanimusic).
 
-[![Screenshot](http://erich.realtimerendering.com/datanimusic/screenshot.png)](https://github.com/erich666/turk)
+[![Screenshot](http://erich.realtimerendering.com/datanimusic/screenshot1.png)](https://github.com/erich666/turk)
 
 Inspired by the Animusic video "Pipe Dream" ([watch it on YouTube](http://www.youtube.com/watch?v=hyCIpKAIFyo)) and [Euphony](https://github.com/qiao/euphony) by [Xueqiao Xu](https://github.com/qiao).
 Built atop the [Musical Turk](http://ulysse.io/turk) framework by [Ulysse Carion](http://ulysse.io).
