@@ -602,6 +602,9 @@ function newTune() {
   clearWhackers();
   resetKeyCounts();
   darkenKeys(0);
+  if ( notes.length > 0 ) {
+    console.log("song length: " + parseInt(notes[notes.length-1].time/1000));
+  }
 }
 
 function resetTimer(songTime) {
