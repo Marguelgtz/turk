@@ -16,6 +16,21 @@ var keyLengthOffset = -70;
 var keyWidthSpacing = keyWidth + 4;
 var keyWidthOffset = -keyWidthSpacing * 5.5;
 
+var pianoWhiteKeyLength = Math.abs(keyLengthSpacing) * 0.85;
+var pianoWhiteKeyWidth = pianoWhiteKeyLength * 1.2/6.1;
+var pianoWhiteKeyWidthSpacing = 1.07 * pianoWhiteKeyWidth;
+var pianoWhiteKeyThickness = pianoWhiteKeyWidth * 2/3;
+var pianoBlackKeyLength = pianoWhiteKeyLength * 4/6.1;
+var pianoBlackKeyWidth = pianoWhiteKeyWidth * 0.5;
+var pianoBlackKeyThickness = pianoWhiteKeyThickness * 2;
+// constant vectors
+var pianoWhiteKeyOffset;
+var pianoBlackKeyOffset;
+var pianoWhiteKeyScale;
+var pianoBlackKeyScale;
+// starting with left edge of C, center Z location along the 7 white keys
+var pianoSpacing = [ 0.5, 1, 1.5, 2, 2.5, 3.5, 4, 4.5, 5, 5.5, 6, 6.5 ];
+
 var numKeys = 88;
 
 var ballRadius = 2;
@@ -48,6 +63,9 @@ var spindleRadius = 0.3 * ballRadius;
 // top of parabola
 var bounceHeight = 70;
 
+// key animations at start
+var keysDone = false;
+
 var keys = [];
 var balls = [];
 var whackers = [];
@@ -68,10 +86,16 @@ var prevNotesLength = 999999999;
 var ballGeo, dropperGeo, whackerArmGeo, whackerPlateGeo;
 var ballMtl, dropperMtl, whackerMtl, whackerPlateMtl;
 
+var tempVec;
+var tempColor;
+var uniformScaleVec;
+var zeroVec;
+
 // when set true, animation no longer changes
 var debugFreezeFrame = false;
 // look for time jump
 //var debugPrevTime = 0;
+
 
 function init() {
   var WIDTH = $('.rest').width() - 5,
@@ -82,6 +106,11 @@ function init() {
       FAR = 10000;
 
   //console.log('Size: ' + WIDTH + ' ' + HEIGHT);
+
+  tempVec = new THREE.Vector3();
+  tempColor = new THREE.Color();
+  uniformScaleVec = new THREE.Vector3(1,1,1);
+  zeroVec = new THREE.Vector3(0,0,0);
 
   // Determine how much time is spent falling, bouncing up, and bouncing down
   var span1 = Math.sqrt(dropperHeight - whackerHeight);
@@ -116,6 +145,7 @@ function init() {
   renderer.setSize(WIDTH, HEIGHT);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.BasicShadowMap;
+  renderer.setClearColor( 0x444444 );
 
   // attach the render-supplied DOM element
   $('#turk').append(renderer.domElement);
@@ -173,7 +203,7 @@ function addLighting() {
   dirLight.shadow.camera.near = 0;
   dirLight.shadow.camera.far = dropperHeight+dropperPartHeight+housingCapOuterRadius + 2;
   dirLight.shadow.camera.right = housingCapOuterRadius + 1;
-  dirLight.shadow.camera.left = keyLengthOffset + keyLengthSpacing*7 - keyLength/2 - 1;
+  dirLight.shadow.camera.left = keyLengthOffset + keyLengthSpacing*8 - keyLength/2 - 1;
   // actually left, looking down keys at housing
   // measurement assumes housing is wider than the set of keys
   dirLight.shadow.camera.top	= housingWidth/2 + housingThickness + 1;
@@ -229,8 +259,14 @@ function addDropper() {
 }
 
 function addKeys() {
+  pianoWhiteKeyOffset = new THREE.Vector3(0,0,0);
+  // the 1.05 and 0.95 are to avoid z-fighting, letting the black keys poke through the back and bottom a little.
+  pianoBlackKeyOffset = new THREE.Vector3(1.05 * (pianoWhiteKeyLength-pianoBlackKeyLength)/2, 0.95 * (pianoBlackKeyThickness-pianoWhiteKeyThickness)/2, 0);
+  pianoWhiteKeyScale = new THREE.Vector3(pianoWhiteKeyLength/keyLength, pianoWhiteKeyThickness/keyThickness, pianoWhiteKeyWidth/keyWidth);
+  pianoBlackKeyScale = new THREE.Vector3(pianoBlackKeyLength/keyLength, pianoBlackKeyThickness/keyThickness, pianoBlackKeyWidth/keyWidth);
+    
   for (var i = 0; i < numKeys; i++) {
-    // 8 rows of 12 keys each, 4 at highest range
+    // 9 rows of 12 keys each, 3 at lowest range and 1 at highest range
     var key = new THREE.Mesh(
       new THREE.BoxBufferGeometry(keyLength, keyThickness, keyWidth),
       new THREE.MeshPhysicalMaterial( {roughness: 1.0} )
@@ -240,6 +276,8 @@ function addKeys() {
     key.ballCount = 0;
     key.frameBallCount = 0;
     key.lastTap = 0;
+    key.number = i;
+    key.black = false;
 
     // key "unhighlighted" color
     // is it a black key? darken
@@ -247,11 +285,12 @@ function addKeys() {
     var keyType = i % 12;
     if ( keyType === 1 || keyType === 4 || keyType === 6 || keyType === 9 || keyType === 11 ) {
       // not gamma corrected, but so be it.
+      key.black = true;
       blackScale *= 0.4;
     }
 
-    // play with .75 to cycle the colors (could even animate it)
-    key.material.color.setHSL((1.75-parseInt( i / 12 )/8)%1, 1, blackScale );
+    // you could play with .75 to cycle the colors
+    key.material.color.setHSL((1.75-i/100)%1, 1, blackScale );
     key.r = key.material.color.r;
     key.g = key.material.color.g;
     key.b = key.material.color.b;
@@ -260,6 +299,9 @@ function addKeys() {
 
     keyPosition( i, key.position );
     setKeyDepth(key);
+    key.final_position = new THREE.Vector3();
+    key.final_position.copy(key.position);
+    createPianoKey(key);
 
     scene.add(key);
 
@@ -267,10 +309,32 @@ function addKeys() {
   }
 }
 
+function createPianoKey(key)
+{
+  key.piano = new Object();
+  key.piano.position = new THREE.Vector3();
+  // the tricky bit: computing the key location
+  var id = key.number + 9;
+  // subtract off the 5, which is what the 9 offset causes for the first key
+  var relPos = parseInt( id / 12 ) * 7 + pianoSpacing[ id % 12 ] - 5;
+  // there are 52 white keys, so middle is 26
+  key.piano.position.set( 4 * keyLengthSpacing + keyLengthOffset, key.final_position.y, relPos * pianoWhiteKeyWidthSpacing - pianoWhiteKeyWidthSpacing*26 );
+  key.piano.offset = key.black ? pianoBlackKeyOffset : pianoWhiteKeyOffset;
+  key.piano.scale = key.black ? pianoBlackKeyScale : pianoWhiteKeyScale;
+}
+
 function keyPosition(id, pos) {
+  // add 9 so that beginning keys A A# B appear at end of line
+  id += 9;
   pos.x = parseInt( id / 12 ) * keyLengthSpacing + keyLengthOffset;
   pos.z = ( id % 12 ) * keyWidthSpacing + keyWidthOffset;
-  pos.y = 0;
+  pos.y = -ballRadius;
+}
+
+function setKeyDepth(key) {
+  var heightAdjust = scaleCount * (key.ballCount + key.frameBallCount);
+  key.scale.y = heightAdjust+1;
+  key.position.y = -ballRadius - keyThickness/2 - heightAdjust;
 }
 
 function addHousing() {
@@ -394,9 +458,8 @@ function Whacker(keyTarget,dropper,t) {
   // shorten real arm so that hit location is better against sphere's surface
   var adjustedWhackerHeight = whackerArmHeight - (ballRadius+whackerPlateHeight/2)/Math.cos(zrot);
 
-  var vec = new THREE.Vector3();
-  keyPosition( keyTarget, vec );
-  vec.z -= dropper * dropperWidth + dropperWidthOffset;
+  keyPosition( keyTarget, tempVec );
+  tempVec.z -= dropper * dropperWidth + dropperWidthOffset;
 
   this.target = keyTarget;
   this.dropper = dropper; // only used for debugging
@@ -417,7 +480,7 @@ function Whacker(keyTarget,dropper,t) {
   );
   this.plate.position.y = -adjustedWhackerHeight;
   this.plate.rotation.z = zrot;
-  this.plate.rotation.x = -Math.atan2(vec.z,-vec.x)/2;
+  this.plate.rotation.x = -Math.atan2(tempVec.z,-tempVec.x)/2;
   this.plate.scale.x = 2.0;
   this.plate.castShadow = true;
   this.plate.receiveShadow = true;
@@ -447,6 +510,11 @@ function extendKeyFully(keyID)
 {
   keys[keyID].ballCount++;
 }
+
+function lerpClamp(t, min, max) {
+  var val = Math.min(Math.max(t, min), max);
+  return ( val - min ) / ( max - min );
+};
 
 function moveBalls(t) {
   var x,y,z, timeDiff;
@@ -554,36 +622,90 @@ function clearWhackers() {
   }
 }
 
-function setKeyDepth(key) {
-  var heightAdjust = scaleCount * (key.ballCount + key.frameBallCount);
-  key.scale.y = heightAdjust+1;
-  key.position.y = -ballRadius - keyThickness/2 - heightAdjust;
+function animateKeys(t) {
+  // initial keyboard to grid animation
+  moveKeys(t);
+  //debugFreezeFrame = true;
+
+  if ( keysDone ) {
+    for (var i = 0; i < numKeys; i++) {
+      var key = keys[i];
+
+      // take last time key was tapped and fade
+      if ( key.lastTap > 0 ) {
+        if ( key.lastTap + ballFadeDuration > t ) {
+          var fadeTime = (t - key.lastTap) / ballFadeDuration;
+          key.material.color.setRGB(
+            (1-fadeTime) + fadeTime*key.r,
+            (1-fadeTime) + fadeTime*key.g,
+            (1-fadeTime) + fadeTime*key.b
+          );
+        } else {
+          // set back to clear
+          key.material.color.setRGB(key.r, key.g, key.b);
+          key.lastTap = 0;
+        }  
+      }
+
+      // compute key height from fraction and full.
+      setKeyDepth(key);
+      // reset after each frame
+      key.frameBallCount = 0;
+    }
+  }
 }
 
-function darkenKeys(t) {
-  for (var i = 0; i < numKeys; i++) {
-    var key = keys[i];
-
-    // take last time key was tapped and fade
-    if ( key.lastTap > 0 ) {
-      if ( key.lastTap + ballFadeDuration > t ) {
-        var fadeTime = (t - key.lastTap) / ballFadeDuration;
-        key.material.color.setRGB(
-          (1-fadeTime) + fadeTime*key.r,
-          (1-fadeTime) + fadeTime*key.g,
-          (1-fadeTime) + fadeTime*key.b
-        );
-      } else {
-        // set back to clear
-        key.material.color.setRGB(key.r, key.g, key.b);
-        key.lastTap = 0;
-      }  
+function moveKeys(t) {
+  if ( t < 0 || !keysDone ) {
+    if ( t > 0 ) {
+      keysDone = true;
+      t = 0;
     }
+    for (var i = 0; i < numKeys; i++) {
+      // 9 rows of 12 keys each, 3 at lowest range and 1 at highest range
+      var key = keys[i];
 
-    // compute key height from fraction and full.
-    setKeyDepth(key);
-    // reset after each frame
-    key.frameBallCount = 0;
+      // first move: keys pull apart vertically to separate octaves
+      var animVerticalStart = -5*startDelay/6;
+      var animVerticalEnd = -4*startDelay/6;
+      var animHorizontalStart = -4*startDelay/6;
+      var animHorizontalEnd = -1*startDelay/6;
+      var animShapeStart = -2*startDelay/6;
+      var animShapeEnd = -1*startDelay/6;
+      var animColorStart = -3*startDelay/6;
+      var animColorEnd = -1*startDelay/6;
+
+      // set piano key position, lerp from it
+      key.position.copy( key.piano.position );
+      key.scale.copy( key.piano.scale );
+
+      if ( t < animVerticalEnd ) {
+        var vertInterp = lerpClamp( t, animVerticalStart, animVerticalEnd );
+        tempVec.set( key.final_position.x, key.final_position.y, key.piano.position.z );
+        key.position.lerp( tempVec, vertInterp );
+      } else {
+        // second move: key sets move into place horizontally
+        var horizInterp = lerpClamp( t, animHorizontalStart, animHorizontalEnd );
+        // start position
+        key.position.x = key.final_position.x;
+        tempVec.set( key.final_position.x, key.final_position.y, key.final_position.z );
+        key.position.lerp( tempVec, horizInterp );
+      }
+
+      // transform: keys change shape
+      var shapeInterp = lerpClamp( t, animShapeStart, animShapeEnd );
+      key.scale.lerp( uniformScaleVec, shapeInterp);
+      tempVec.copy(key.piano.offset);
+      tempVec.lerp( zeroVec, shapeInterp);
+
+      key.position.add(tempVec);
+
+      // color shift: keys change to colors
+      var colorInterp = lerpClamp( t, animColorStart, animColorEnd );
+      key.material.color.setScalar( key.black ? 0.1 : 1.0 );
+      tempColor.setRGB( key.r, key.g, key.b );
+      key.material.color.lerp( tempColor, colorInterp );
+    }
   }
 }
 
@@ -601,7 +723,7 @@ function newTune() {
   clearBalls();
   clearWhackers();
   resetKeyCounts();
-  darkenKeys(0);
+  animateKeys(0);
   if ( notes.length > 0 ) {
     console.log("song length: " + parseInt(notes[notes.length-1].time/1000));
   }
@@ -641,7 +763,7 @@ function animate() {
 
     moveBalls(currTime);
     moveWhackers(currTime);
-    darkenKeys(currTime);
+    animateKeys(currTime);
     //debugPrevTime = currTime;
   }
 
