@@ -656,10 +656,10 @@ function animateKeys(t) {
 }
 
 function moveKeys(t) {
-  if ( t < 0 || !keysDone ) {
+  // 
+  if ( !keysDone ) {
     if ( t > 0 ) {
       keysDone = true;
-      t = 0;
     }
     for (var i = 0; i < numKeys; i++) {
       // 9 rows of 12 keys each, 3 at lowest range and 1 at highest range
