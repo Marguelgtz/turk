@@ -34,6 +34,9 @@ var pianoSpacing = [ 0.5, 1, 1.5, 2, 2.5, 3.5, 4, 4.5, 5, 5.5, 6, 6.5 ];
 var numKeys = 88;
 
 var ballRadius = 2;
+// or set these to zero if you don't like the balls scattering on the keys
+var ballScatterWidth = keyWidth - 2 * ballRadius;
+var ballScatterHeight = keyLength - 2 * ballRadius;
 
 // how much does a ball add to the height of a key?
 var scaleCount = ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*keyWidth);
@@ -393,6 +396,9 @@ function Ball(keyTarget,dropper,t) {
   this.start = new THREE.Vector3(0, dropperHeight, dropper * dropperWidth + dropperWidthOffset);
   this.end = new THREE.Vector3();
   keyPosition( keyTarget, this.end );
+  // jitter the end position a bit, so you can see multiple ball hits (thanks, Andrew)
+  this.end.x += (Math.random()-0.5) * ballScatterHeight;
+  this.end.z += (Math.random()-0.5) * ballScatterWidth;
   this.time = t;
   this.hit = false;
   this.object = new THREE.Mesh(
