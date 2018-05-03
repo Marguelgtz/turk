@@ -673,13 +673,13 @@ function moveKeys(t) {
 
       // first move: keys pull apart vertically to separate octaves
       var animVerticalStart = -5*startDelay/6;
-      var animVerticalEnd = -4*startDelay/6;
-      var animHorizontalStart = -4*startDelay/6;
+      var animVerticalEnd = -3.5*startDelay/6;
+      var animHorizontalStart = -3.5*startDelay/6;
       var animHorizontalEnd = -1*startDelay/6;
-      var animShapeStart = -2*startDelay/6;
+      var animShapeStart = -2.5*startDelay/6;
       var animShapeEnd = -1*startDelay/6;
       var animColorStart = -3*startDelay/6;
-      var animColorEnd = -1*startDelay/6;
+      var animColorEnd = -0.5*startDelay/6;
 
       // set piano key position, lerp from it
       key.position.copy( key.piano.position );
@@ -687,11 +687,13 @@ function moveKeys(t) {
 
       if ( t < animVerticalEnd ) {
         var vertInterp = lerpClamp( t, animVerticalStart, animVerticalEnd );
+        vertInterp = tweenQuadraticInOut(vertInterp);
         tempVec.set( key.final_position.x, key.final_position.y, key.piano.position.z );
         key.position.lerp( tempVec, vertInterp );
       } else {
         // second move: key sets move into place horizontally
         var horizInterp = lerpClamp( t, animHorizontalStart, animHorizontalEnd );
+        horizInterp = tweenQuadraticInOut(horizInterp);
         // start position
         key.position.x = key.final_position.x;
         tempVec.set( key.final_position.x, key.final_position.y, key.final_position.z );
@@ -700,6 +702,7 @@ function moveKeys(t) {
 
       // transform: keys change shape
       var shapeInterp = lerpClamp( t, animShapeStart, animShapeEnd );
+      shapeInterp = tweenQuadraticInOut(shapeInterp);
       key.scale.lerp( uniformScaleVec, shapeInterp);
       tempVec.copy(key.piano.offset);
       tempVec.lerp( zeroVec, shapeInterp);
@@ -708,11 +711,20 @@ function moveKeys(t) {
 
       // color shift: keys change to colors
       var colorInterp = lerpClamp( t, animColorStart, animColorEnd );
+      colorInterp = tweenQuadraticInOut(colorInterp);
       key.material.color.setScalar( key.black ? 0.1 : 1.0 );
       tempColor.setRGB( key.r, key.g, key.b );
       key.material.color.lerp( tempColor, colorInterp );
     }
   }
+}
+
+function tweenQuadraticInOut(k) {
+  if ((k *= 2) < 1) {
+    return 0.5 * k * k;
+  }
+
+  return - 0.5 * (--k * (k - 2) - 1);
 }
 
 function resetKeyCounts() {
