@@ -38,6 +38,9 @@ var ballRadius = 2;
 var ballScatterWidth = keyWidth - 2 * ballRadius;
 var ballScatterHeight = keyLength - 2 * ballRadius;
 
+// should not be larger than crossbarRadius
+var connectorRadius = 0.3 * ballRadius;
+
 // how much does a ball add to the height of a key?
 var scaleCount = ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*keyWidth);
 
@@ -72,6 +75,7 @@ var keysDone = false;
 var keys = [];
 var balls = [];
 var whackers = [];
+var connectors = [];
 
 var ballHeadstart = 1730;
 var ballFadeDuration = 1730;
@@ -86,13 +90,21 @@ var timeInSong = -startDelay;
 var localStartTime;
 var prevNotesLength = 999999999;
 
-var ballGeo, dropperGeo, whackerArmGeo, whackerPlateGeo;
+var prevNoteTime = 999999999;
+var prevBall;
+
+var ballGeo, dropperGeo, whackerArmGeo, whackerPlateGeo, connectorGeo;
 var ballMtl, dropperMtl, whackerMtl, whackerPlateMtl;
 
 var tempVec;
 var tempColor;
 var uniformScaleVec;
 var zeroVec;
+var yAxis;
+var rotationAxis;
+var rotMatrix;
+var scaleMatrix;
+
 
 // when set true, animation no longer changes
 var debugFreezeFrame = false;
@@ -114,6 +126,11 @@ function init() {
   tempColor = new THREE.Color();
   uniformScaleVec = new THREE.Vector3(1,1,1);
   zeroVec = new THREE.Vector3(0,0,0);
+  yAxis = new THREE.Vector3(0,1,0);
+  rotationAxis = new THREE.Vector3();
+
+  rotMatrix = new THREE.Matrix4();
+  scaleMatrix = new THREE.Matrix4();
 
   // Determine how much time is spent falling, bouncing up, and bouncing down
   var span1 = Math.sqrt(dropperHeight - whackerHeight);
@@ -133,11 +150,12 @@ function init() {
   ballGeo = new THREE.SphereBufferGeometry(ballRadius, 20, 10);
   ballMtl = new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.5, metalness: 0.5 });
   dropperGeo = new THREE.CylinderBufferGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
-  dropperMtl =new THREE.MeshPhysicalMaterial({ color: dropperColor });
+  dropperMtl = new THREE.MeshPhysicalMaterial({ color: dropperColor });
   whackerArmGeo = new THREE.CylinderBufferGeometry(whackerRadius, whackerRadius, whackerArmHeight, 10, 1);
   whackerPlateGeo = new THREE.CylinderBufferGeometry(whackerPlateRadius, whackerPlateRadius, whackerPlateHeight, 30, 1);
-  whackerMtl =new THREE.MeshPhysicalMaterial({ color: whackerColor });
-  whackerPlateMtl =new THREE.MeshPhysicalMaterial({ color: whackerPlateColor, roughness: 0.64, metalness: 0.67 });
+  whackerMtl = new THREE.MeshPhysicalMaterial({ color: whackerColor });
+  whackerPlateMtl = new THREE.MeshPhysicalMaterial({ color: whackerPlateColor, roughness: 0.64, metalness: 0.67 });
+  connectorGeo = new THREE.CylinderBufferGeometry(connectorRadius, connectorRadius, 1, 20, 1, true);
 
   camera.position.x = -210;
   camera.position.y = 150;
@@ -209,7 +227,7 @@ function addLighting() {
   dirLight.shadow.camera.left = keyLengthOffset + keyLengthSpacing*8 - keyLength/2 - 1;
   // actually left, looking down keys at housing
   // measurement assumes housing is wider than the set of keys
-  dirLight.shadow.camera.top	= housingWidth/2 + housingThickness + 1;
+  dirLight.shadow.camera.top  = housingWidth/2 + housingThickness + 1;
   dirLight.shadow.camera.bottom = -dirLight.shadow.camera.top;
   dirLight.shadow.mapSize.width = 3000;
   // make height proportional to width so that shadow pixels are "square"
@@ -243,8 +261,9 @@ function addDropper() {
     new THREE.CylinderBufferGeometry( crossbarRadius, crossbarRadius, numDroppers*dropperWidth, 10, 1),
     dropperMtl
   );
-  crossbar.position.set(0, dropperHeight + dropperPartHeight/2 - crossbarRadius, 0);
+  crossbar.position.set(0, dropperHeight, 0);
   crossbar.rotation.set(Math.PI/2, 0, 0);
+  setAsStatic(crossbar);
   //crossbar.castShadow = true;
   //crossbar.receiveShadow = true;
   scene.add(crossbar);
@@ -257,8 +276,15 @@ function addDropper() {
     dropper.position.set(0, dropperHeight, i * dropperWidth + dropperWidthOffset);
     //dropper.castShadow = true;
     //dropper.receiveShadow = true;
+    setAsStatic(dropper);
     scene.add(dropper);
   }
+}
+
+function setAsStatic(obj) {
+  // never moves, so avoid having three.js constantly update it
+  obj.matrixAutoUpdate = false;
+  obj.updateMatrix();
 }
 
 function addKeys() {
@@ -353,6 +379,7 @@ function addHousing() {
   housing.rotation.set(Math.PI/2, 1.25*Math.PI, 0);
   //housing.castShadow = true;
   housing.receiveShadow = true;
+  setAsStatic(housing);
   scene.add(housing);
 
   var housingCapGeo = new PipeGeometry(spindleRadius/2, spindleRadius/2, housingCapOuterRadius, housingCapOuterRadius, housingThickness, housingThickness,
@@ -367,6 +394,7 @@ function addHousing() {
   housingCap1.position.set(0,0,(housingWidth+housingThickness)/2);
   //housingCap1.castShadow = true;
   housingCap1.receiveShadow = true;
+  setAsStatic(housingCap1);
   scene.add(housingCap1);
   
   var housingCap2 = new THREE.Mesh(
@@ -378,6 +406,7 @@ function addHousing() {
   housingCap2.position.set(0,0,-(housingWidth+housingThickness)/2);
   //housingCap2.castShadow = true;
   housingCap2.receiveShadow = true;
+  setAsStatic(housingCap2);
   scene.add(housingCap2);
   
   var spindle = new THREE.Mesh(
@@ -387,6 +416,7 @@ function addHousing() {
   spindle.rotation.set(Math.PI/2, 0, 0);
   spindle.castShadow = true;
   spindle.receiveShadow = true;
+  setAsStatic(spindle);
   scene.add(spindle);
 }
 
@@ -436,6 +466,12 @@ function addBallsToMusic(t) {
     if (notes[0].time + hitEnd > t ) {
       addBall(keyID, currentDropper, notes[0].time);
       addWhacker(keyID, currentDropper, notes[0].time);
+      if ( prevNoteTime === notes[0].time ) {
+        // previous note's time matches this note's, so make a connector
+        addConnector( prevBall, balls[balls.length-1])
+      }
+      prevNoteTime = notes[0].time;
+      prevBall = balls[balls.length-1];
     } else {
       // note the ball's effect on the key
       extendKeyFully(keyID);
@@ -454,6 +490,28 @@ function addBallsToMusic(t) {
       return;
     }
   }
+}
+
+function Connector(ball1, ball2) {
+  this.ball1 = ball1;
+  this.ball2 = ball2;
+  this.object = new THREE.Mesh(
+    connectorGeo,
+    // separate material for each, as we change transparency on fade out
+    new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.5, metalness: 0.5 })
+  );
+  this.object.castShadow = true;
+  this.object.receiveShadow = true;
+  // we compute our own transform each frame
+  this.object.matrixAutoUpdate = false;
+}
+
+function addConnector(ball1, ball2) {
+  var connector = new Connector(ball1, ball2);
+
+  connectors.push(connector);
+
+  scene.add(connector.object);
 }
 
 function Whacker(keyTarget,dropper,t) {
@@ -579,6 +637,73 @@ function moveBalls(t) {
       balls.splice(i, 1);
     }
   }
+}
+
+// assume to be called after moveBalls, so that the balls are in positions
+function moveConnectors(t) {
+  var x,y,z, timeDiff;
+  for (var i = connectors.length - 1; i >= 0; i--) {
+    var connector = connectors[i];
+    var animTime = t - connector.ball1.time;
+
+    if (animTime < hitStart) {
+      // transform
+      cylinderEndpointsToTransform( connector.object, connector.ball1.object.position, connector.ball2.object.position );
+    } else if (animTime < hitSunk) {
+      timeDiff = (animTime-hitStart)/(hitSunk-hitStart);
+      if ( timeDiff >= 1 ) {
+        connector.object.visible = false;
+      } else {
+        // fade by transparency
+        connector.object.material.transparent = true;
+        connector.object.material.opacity = 1 - timeDiff;
+        cylinderEndpointsToTransform( connector.object, connector.ball1.object.position, connector.ball2.object.position );
+      }
+    } else {
+      // delete connector, we're at end of life
+      scene.remove(connector.object);
+      // remove ball from array
+      connectors.splice(i, 1);
+    }
+  }
+}
+
+// Transform a unit-height cylinder of given radius to align with given axis and then move to center
+function cylinderEndpointsToTransform( cyl, top, bottom )
+{
+  // done on creation:
+  //cyl.matrixAutoUpdate = false;
+  
+  tempVec.addVectors( top, bottom );
+  tempVec.divideScalar( 2.0 );
+
+  // From left to right using frames: translate, then rotate, then scale; TRS.
+  // So translate is first.
+  cyl.matrix.makeTranslation( tempVec.x, tempVec.y, tempVec.z );
+
+  // scale along Y axis
+  tempVec.subVectors( top, bottom );  // desired cylinder axis direction
+  scaleMatrix.makeScale( 1, tempVec.length(), 1)
+
+  // take cross product of  and up vector to get axis of rotation
+  // Needed later for dot product, just do it now.
+  tempVec.normalize();
+  rotationAxis.crossVectors( tempVec, yAxis );
+  if ( rotationAxis.length() < 0.000001 )
+  {
+    // Special case: if rotationAxis is just about zero, set to X axis,
+    // so that the angle can be given as 0 or PI. This works ONLY
+    // because we know one of the two axes is +Y.
+    rotationAxis.set( 1, 0, 0 );
+  }
+  rotationAxis.normalize();
+
+  // take dot product of cylinder axis and up vector to get cosine of angle of rotation
+  var theta = -Math.acos( tempVec.dot( yAxis ) );
+  rotMatrix.makeRotationAxis( rotationAxis, theta );
+  cyl.matrix.multiply( rotMatrix );
+  
+  cyl.matrix.multiply( scaleMatrix );
 }
 
 function moveWhackers(t) {
@@ -780,6 +905,7 @@ function animate() {
     }
 
     moveBalls(currTime);
+    moveConnectors(currTime);
     moveWhackers(currTime);
     animateKeys(currTime);
     //debugPrevTime = currTime;
