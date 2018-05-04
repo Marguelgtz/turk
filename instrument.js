@@ -110,6 +110,7 @@ var scaleMatrix;
 var debugFreezeFrame = false;
 // look for time jump
 //var debugPrevTime = 0;
+//var totalConnectors = 0;
 
 
 function init() {
@@ -466,7 +467,8 @@ function addBallsToMusic(t) {
     if (notes[0].time + hitEnd > t ) {
       addBall(keyID, currentDropper, notes[0].time);
       addWhacker(keyID, currentDropper, notes[0].time);
-      if ( prevNoteTime === notes[0].time ) {
+      // if notes are within 10/1000ths of a second, consider it a chord
+      if ( prevBall && notes[0] && prevNoteTime + 0 >= notes[0].time ) {
         // previous note's time matches this note's, so make a connector
         addConnector( prevBall, balls[balls.length-1])
       }
@@ -512,6 +514,7 @@ function addConnector(ball1, ball2) {
   connectors.push(connector);
 
   scene.add(connector.object);
+  //console.log("total connectors: " + totalConnectors++ );
 }
 
 function Whacker(keyTarget,dropper,t) {
