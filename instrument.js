@@ -33,6 +33,8 @@ var pianoSpacing = [ 0.5, 1, 1.5, 2, 2.5, 3.5, 4, 4.5, 5, 5.5, 6, 6.5 ];
 
 var numKeys = 88;
 
+var notesIndex = 0;
+
 var ballRadius = 2;
 // or set these to zero if you don't like the balls scattering on the keys
 var ballScatterWidth = keyWidth - 2 * ballRadius;
@@ -452,44 +454,47 @@ function addBall(keyTarget,dropper,t) {
 
 // add balls if time to do so
 function addBallsToMusic(t) {
-  if (notes.length === 0)
-    return;
-
   // is note's playing time less the head start less that the current time
-  while (notes[0].time - ballHeadstart < t ) {
-    // if ball time has passed - don't add it, if so; just remove note
-    var keyID = notes[0].note - MIDI.pianoKeyOffset;
+  if (notes && notes.length > notesIndex) {
 
-    // debug: to force a particular octave, e.g. the highest, 7*12
-    //keyID = 7*12 + keyID % 12;
-    //keyID = keyID % 12;
+    while (notes[notesIndex].time - ballHeadstart < t ) {
+      // if ball time has passed - don't add it, if so; just remove note
+      var note = notes[notesIndex];
+      var keyID = note.note - MIDI.pianoKeyOffset;
 
-    if (notes[0].time + hitEnd > t ) {
-      addBall(keyID, currentDropper, notes[0].time);
-      addWhacker(keyID, currentDropper, notes[0].time);
-      // if notes are within 10/1000ths of a second, consider it a chord
-      if ( prevBall && notes[0] && prevNoteTime + 0 >= notes[0].time ) {
-        // previous note's time matches this note's, so make a connector
-        addConnector( prevBall, balls[balls.length-1])
+      // debug: to force a particular octave, e.g. the highest, 7*12
+      //keyID = 7*12 + keyID % 12;
+      //keyID = keyID % 12;
+
+      if (note.time + hitEnd > t ) {
+        addBall(keyID, currentDropper, note.time);
+        addWhacker(keyID, currentDropper, note.time);
+        // if notes are within 10/1000ths of a second, consider it a chord
+        if ( prevBall && prevNoteTime + 0 >= note.time ) {
+          // previous note's time matches this note's, so make a connector
+          addConnector( prevBall, balls[balls.length-1])
+        }
+        prevNoteTime = note.time;
+        prevBall = balls[balls.length-1];
+      } else {
+        // note the ball's effect on the key
+        extendKeyFully(keyID);
       }
-      prevNoteTime = notes[0].time;
-      prevBall = balls[balls.length-1];
-    } else {
-      // note the ball's effect on the key
-      extendKeyFully(keyID);
-    }
-    // remove note from note list
-    notes.splice(0, 1);
+      // remove note from note list
+      //notes.splice(0, 1);
+      // better is to change starting count, vs. messing with memory
+      notesIndex++;
 
-    // note ball is added at current dropper, in order, then we increment
-    // (if we know which finger is pressing the key, use that instead)
-    currentDropper++;
-    if ( currentDropper >= numDroppers ) {
-      currentDropper = 0;
-    }
+      // note ball is added at current dropper, in order, then we increment
+      // (if we know which finger is pressing the key, use that instead)
+      currentDropper++;
+      if ( currentDropper >= numDroppers ) {
+        currentDropper = 0;
+      }
 
-    if (notes.length === 0) {
-      return;
+      if (++notesIndex >= notes.length) {
+        return;
+      }
     }
   }
 }
@@ -739,20 +744,33 @@ function moveWhackers(t) {
 }
 
 function clearBalls() {
-  for (var i = balls.length - 1; i >= 0; i--) {
-    var ball = balls[i];
-    scene.remove(ball.object);
-    // remove ball from array
-    balls.splice(i, 1);
+  if ( balls ) {
+    for (var i = balls.length - 1; i >= 0; i--) {
+      var ball = balls[i];
+      scene.remove(ball.object);
+    }
+    balls = [];
   }
+  prevBall = undefined;
 }
 
 function clearWhackers() {
-  for (var i = whackers.length - 1; i >= 0; i--) {
-    var whacker = whackers[i];
-    scene.remove(whacker.object);
-    // remove whacker from array
-    whackers.splice(i, 1);
+  if ( whackers ) {
+    for (var i = whackers.length - 1; i >= 0; i--) {
+      var whacker = whackers[i];
+      scene.remove(whacker.object);
+    }
+    whackers = [];
+  }
+}
+
+function clearConnectors() {
+  if ( connectors ) {
+    for (var i = connectors.length - 1; i >= 0; i--) {
+      var connectors = connectors[i];
+      scene.remove(connectors.object);
+    }
+    connectors = [];
   }
 }
 
@@ -866,8 +884,10 @@ function resetKeyCounts() {
 }
 
 function newTune() {
+  notesIndex = 0;
   clearBalls();
   clearWhackers();
+  clearConnectors();
   resetKeyCounts();
   animateKeys(0);
   if ( notes.length > 0 ) {
@@ -883,6 +903,7 @@ function resetTimer(songTime) {
 function animate() {
   // hack - better would be to get a signal from when the music player plays
   if ( prevNotesLength !== notes.length ) {
+    // TODO - it'd be nice to reset time within this code file, too
     newTune();
   }
   requestAnimationFrame(animate);
@@ -903,9 +924,7 @@ function animate() {
     //if ( debugPrevTime > currTime ) {
     //  console.log(" TIME JUMP " + debugPrevTime + " to " + currTime );
     //}
-    if (musicPlaying) {
-      addBallsToMusic(currTime);
-    }
+    addBallsToMusic(currTime);
 
     moveBalls(currTime);
     moveConnectors(currTime);
