@@ -43,8 +43,8 @@ var ballScatterHeight = keyLength - 2 * ballRadius;
 // should not be larger than crossbarRadius
 var connectorRadius = 0.3 * ballRadius;
 
-// how much does a ball add to the height of a key?
-var scaleCount = ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*keyWidth);
+// how much does a ball add to the height of a key? The right part is "correct", preserving volume. 1.5 is fudge.
+var scaleCount = 1.5 * ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*keyWidth);
 
 var currentDropper = 0;
 var numDroppers = 10;
@@ -76,8 +76,11 @@ var keysDone = false;
 
 var keys = [];
 var balls = [];
+var ballPool = [];
 var whackers = [];
+var whackerPool = [];
 var connectors = [];
+var connectorPool = [];
 
 var ballHeadstart = 1730;
 var ballFadeDuration = 1730;
@@ -423,29 +426,52 @@ function addHousing() {
   scene.add(spindle);
 }
 
-function Ball(keyTarget,dropper,t) {
-  this.target = keyTarget;
+function Ball() {
   //this.dropper = dropper;
-  this.start = new THREE.Vector3(0, dropperHeight, dropper * dropperWidth + dropperWidthOffset);
-  this.end = new THREE.Vector3();
-  keyPosition( keyTarget, this.end );
-  // jitter the end position a bit, so you can see multiple ball hits (thanks, Andrew)
-  this.end.x += (Math.random()-0.5) * ballScatterHeight;
-  this.end.z += (Math.random()-0.5) * ballScatterWidth;
-  this.time = t;
+  this.target = 0;
+  this.time = 0;
   this.hit = false;
+  this.start = new THREE.Vector3();
+  this.end = new THREE.Vector3();
   this.object = new THREE.Mesh(
     ballGeo,
     ballMtl
   );
-  this.object.position.copy( this.start );
-  this.object.castShadow = true;
+  this.free = false;
+}
+
+function initBall(ball,keyTarget,dropper,t) {
+  ball.target = keyTarget;
+  ball.start.set(0, dropperHeight, dropper * dropperWidth + dropperWidthOffset);
+  keyPosition( keyTarget, ball.end );
+  // jitter the end position a bit, so you can see multiple ball hits (thanks, Andrew)
+  ball.end.x += (Math.random()-0.5) * ballScatterHeight;
+  ball.end.z += (Math.random()-0.5) * ballScatterWidth;
+  ball.time = t;
+  ball.hit = false;
+  ball.free = false;
+  ball.object.position.copy( ball.start );
+  // shadow gets turned off at end, so make sure it's on if ball is from pool
+  ball.object.castShadow = true;
+
   // receiving can look bad, see debugFreezeFrame t=5000 for Flight of the Bumblebees, I think it's a bias bug?
-  //this.object.receiveShadow = true;
+  //ball.object.receiveShadow = true;
+}
+
+function assignBall(keyTarget,dropper,t) {
+  var ball;
+  if ( ballPool.length === 0 ) {
+    ball = new Ball();
+  } else {
+    ball = ballPool.pop();
+  }
+  initBall(ball,keyTarget,dropper,t);
+  return ball;
 }
 
 function addBall(keyTarget,dropper,t) {
-  var ball = new Ball(keyTarget,dropper,t);
+  var ball;
+  ball = assignBall(keyTarget,dropper,t);
 
   balls.push(ball);
 
@@ -499,9 +525,9 @@ function addBallsToMusic(t) {
   }
 }
 
-function Connector(ball1, ball2) {
-  this.ball1 = ball1;
-  this.ball2 = ball2;
+function Connector() {
+  this.ball1 = 0;
+  this.ball2 = 0;
   this.object = new THREE.Mesh(
     connectorGeo,
     // separate material for each, as we change transparency on fade out
@@ -511,10 +537,32 @@ function Connector(ball1, ball2) {
   this.object.receiveShadow = true;
   // we compute our own transform each frame
   this.object.matrixAutoUpdate = false;
+  this.free = false;
+}
+
+function initConnector(connector, ball1, ball2) {
+  connector.ball1 = ball1;
+  connector.ball2 = ball2;
+  // reset material, if this is a pooled ball, already faded out
+  connector.object.material.opacity = 1.0;
+  connector.object.material.transparency = false;
+  connector.free = false;
+}
+
+function assignConnector(ball1, ball2)
+{
+  var connector;
+  if ( connectorPool.length === 0 ) {
+    connector = new Connector();
+  } else {
+    connector = connectorPool.pop();
+  }
+  initConnector(connector,ball1, ball2);
+  return connector;
 }
 
 function addConnector(ball1, ball2) {
-  var connector = new Connector(ball1, ball2);
+  var connector = assignConnector(ball1, ball2);
 
   connectors.push(connector);
 
@@ -522,7 +570,34 @@ function addConnector(ball1, ball2) {
   //console.log("total connectors: " + totalConnectors++ );
 }
 
-function Whacker(keyTarget,dropper,t) {
+function Whacker() {
+  this.arm = new THREE.Mesh(
+    whackerArmGeo,
+    whackerMtl
+  );
+  this.arm.castShadow = true;
+  // having these receive shadows is distracting, IMO
+  //this.arm.receiveShadow = true;
+
+  this.target = 0;
+  this.dropper = 0;
+  this.time = 0;
+
+  this.plate = new THREE.Mesh(
+    whackerPlateGeo,
+    whackerPlateMtl
+  );
+  this.plate.castShadow = true;
+  this.plate.receiveShadow = true;
+  
+  this.object = new THREE.Object3D();
+  this.object.add(this.arm);
+  this.object.add(this.plate);
+
+  this.free = false;
+}
+
+function initWhacker(whacker,keyTarget,dropper,t) {
   // take direction to end point and come up with half angle and azimuth, more or less
   var z = parseInt(keyTarget/12);
   var zrot = Math.PI/24 + z * 3*Math.PI/(7*24);
@@ -533,38 +608,36 @@ function Whacker(keyTarget,dropper,t) {
   keyPosition( keyTarget, tempVec );
   tempVec.z -= dropper * dropperWidth + dropperWidthOffset;
 
-  this.target = keyTarget;
-  this.dropper = dropper; // only used for debugging
-  this.time = t;
-  this.arm = new THREE.Mesh(
-    whackerArmGeo,
-    whackerMtl
-  );
-  this.arm.position.y = -adjustedWhackerHeight/2;
-  this.arm.scale.y = adjustedWhackerHeight / whackerHeight;
-  this.arm.castShadow = true;
-  // having these receive shadows is distracting, IMO
-  //this.arm.receiveShadow = true;
+  whacker.target = keyTarget;
+  whacker.dropper = dropper; // only used for debugging
+  whacker.time = t;
 
-  this.plate = new THREE.Mesh(
-    whackerPlateGeo,
-    whackerPlateMtl
-  );
-  this.plate.position.y = -adjustedWhackerHeight;
-  this.plate.rotation.z = zrot;
-  this.plate.rotation.x = -Math.atan2(tempVec.z,-tempVec.x)/2;
-  this.plate.scale.x = 2.0;
-  this.plate.castShadow = true;
-  this.plate.receiveShadow = true;
+  whacker.arm.position.y = -adjustedWhackerHeight/2;
+  whacker.arm.scale.y = adjustedWhackerHeight / whackerHeight;
+
+  whacker.plate.position.y = -adjustedWhackerHeight;
+  whacker.plate.rotation.z = zrot;
+  whacker.plate.rotation.x = -Math.atan2(tempVec.z,-tempVec.x)/2;
+  whacker.plate.scale.x = 2.0;
   
-  this.object = new THREE.Object3D();
-  this.object.add(this.arm);
-  this.object.add(this.plate);
-  this.object.position.set(0, 0, dropper * dropperWidth + dropperWidthOffset);
+  whacker.object.position.set(0, 0, dropper * dropperWidth + dropperWidthOffset);
+
+  whacker.free = false;
+}
+
+function assignWhacker(keyTarget,dropper,t) {
+  var whacker;
+  if ( whackerPool.length === 0 ) {
+    whacker = new Whacker();
+  } else {
+    whacker = whackerPool.pop();
+  }
+  initWhacker(whacker,keyTarget,dropper,t);
+  return whacker;
 }
 
 function addWhacker(keyTarget,dropper,t) {
-  var whacker = new Whacker(keyTarget,dropper,t);
+  var whacker = assignWhacker(keyTarget,dropper,t);
 
   whackers.push(whacker);
 
@@ -638,11 +711,14 @@ function moveBalls(t) {
       }
       extendKeyFraction(ball.target,timeDiff);
     } else {
-      // delete ball, we're at end of life
-      extendKeyFully(ball.target);
-      scene.remove(ball.object);
-      // remove ball from array
-      balls.splice(i, 1);
+      // delete ball if necessary, we're at end of life
+      if ( !ball.free ) {
+        balls.splice(i,1);
+        extendKeyFully(ball.target);
+        scene.remove(ball.object);
+        ball.free = true;
+        ballPool.push(ball);
+      }
     }
   }
 }
@@ -669,9 +745,13 @@ function moveConnectors(t) {
       }
     } else {
       // delete connector, we're at end of life
-      scene.remove(connector.object);
-      // remove ball from array
-      connectors.splice(i, 1);
+      if ( !connector.free ) {
+        // remove connector from array
+        connectors.splice(i, 1);
+        scene.remove(connector.object);
+        connector.free = true;
+        connectorPool.push(connector);
+      }
     }
   }
 }
@@ -736,18 +816,24 @@ function moveWhackers(t) {
       //}
     } else {
       // delete whacker, we're at end of life
-      scene.remove(whacker.object);
-      // remove ball from array
-      whackers.splice(i, 1);
+      if ( !whacker.free ) {
+        // remove whacker from array
+        whackers.splice(i, 1);
+        scene.remove(whacker.object);
+        whacker.free = true;
+        whackerPool.push(whacker);
+      }
     }
   }
 }
 
 function clearBalls() {
-  if ( balls ) {
+  if ( balls && balls.length > 0 ) {
     for (var i = balls.length - 1; i >= 0; i--) {
       var ball = balls[i];
       scene.remove(ball.object);
+      ballPool.push(ball);
+      ball.free = true;
     }
     balls = [];
   }
@@ -755,20 +841,24 @@ function clearBalls() {
 }
 
 function clearWhackers() {
-  if ( whackers ) {
+  if ( whackers && whackers.length > 0 ) {
     for (var i = whackers.length - 1; i >= 0; i--) {
       var whacker = whackers[i];
       scene.remove(whacker.object);
+      whackerPool.push(whacker);
+      whacker.free = true;
     }
     whackers = [];
   }
 }
 
 function clearConnectors() {
-  if ( connectors ) {
+  if ( connectors && connectors.length > 0 ) {
     for (var i = connectors.length - 1; i >= 0; i--) {
-      var connectors = connectors[i];
-      scene.remove(connectors.object);
+      var connector = connectors[i];
+      scene.remove(connector.object);
+      connectorPool.push(connector);
+      connector.free = true;
     }
     connectors = [];
   }
