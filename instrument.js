@@ -1,6 +1,6 @@
 "use strict";
 
-var renderer, scene, camera, controls;
+var renderer, scene, camera, controls, headlight;
 
 var ballColor = 0xD4D4BF;
 var dropperColor = 0xD4D4BF;
@@ -154,7 +154,7 @@ function init() {
   scene = new THREE.Scene();
   
   ballGeo = new THREE.SphereBufferGeometry(ballRadius, 20, 10);
-  ballMtl = new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.5, metalness: 0.5 });
+  ballMtl = new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.3, metalness: 0.5 });
   dropperGeo = new THREE.CylinderBufferGeometry(dropperRadius, ballRadius, dropperPartHeight, 20, 1);
   dropperMtl = new THREE.MeshPhysicalMaterial({ color: dropperColor });
   whackerArmGeo = new THREE.CylinderBufferGeometry(whackerRadius, whackerRadius, whackerArmHeight, 10, 1);
@@ -223,7 +223,7 @@ function fillScene() {
 }
 
 function addLighting() {
-  var dirLight = new THREE.DirectionalLight( 0xeeeeee, 1 );
+  var dirLight = new THREE.DirectionalLight( 0xbbbbbb, 1 );
   dirLight.name = 'Dir. Light';
   dirLight.position.set( 0, dropperHeight+dropperPartHeight+1, 0 );
   dirLight.castShadow = true;
@@ -244,13 +244,15 @@ function addLighting() {
   // debug aid: shows light's camera bounds.
   //scene.add( new THREE.CameraHelper( dirLight.shadow.camera ) );
 
-  var light2 = new THREE.DirectionalLight(0xbbbbbb);
+  headlight = new THREE.PointLight(0xdddddd);
 
-  light2.position.x = 200;
+  headlight.position.copy(camera.position);
+
+  scene.add(headlight);
+
+/*light2.position.x = 200;
   light2.position.y = 200;
   light2.position.z = -500;
-
-  scene.add(light2);
 
   var light3 = new THREE.DirectionalLight(0xeeeeee);
 
@@ -259,6 +261,7 @@ function addLighting() {
   light3.position.z = 300;
 
   scene.add(light3);
+ */
 }
 
 function addDropper() {
@@ -531,7 +534,7 @@ function Connector() {
   this.object = new THREE.Mesh(
     connectorGeo,
     // separate material for each, as we change transparency on fade out
-    new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.5, metalness: 0.5 })
+    new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.3, metalness: 0.5 })
   );
   this.object.castShadow = true;
   this.object.receiveShadow = true;
@@ -991,6 +994,9 @@ function resetTimer(songTime) {
 }
 
 function animate() {
+
+  headlight.position.copy(camera.position);
+
   // hack - better would be to get a signal from when the music player plays
   if ( prevNotesLength !== notes.length ) {
     // TODO - it'd be nice to reset time within this code file, too
