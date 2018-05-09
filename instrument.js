@@ -1,6 +1,9 @@
 "use strict";
 
+var runAnimation = false;
+
 var renderer, scene, camera, controls, headlight;
+var cameraSet = [];
 
 var ballColor = 0xD4D4BF;
 var dropperColor = 0xD4D4BF;
@@ -102,6 +105,7 @@ var ballGeo, dropperGeo, whackerArmGeo, whackerPlateGeo, connectorGeo;
 var ballMtl, dropperMtl, whackerMtl, whackerPlateMtl;
 
 var tempVec;
+var tempTarget;
 var tempColor;
 var uniformScaleVec;
 var zeroVec;
@@ -117,18 +121,43 @@ var debugFreezeFrame = false;
 //var debugPrevTime = 0;
 //var totalConnectors = 0;
 
+var WIDTH, HEIGHT, VIEW_ANGLE, ASPECT, NEAR, FAR;
+
+var keyFrames = [];
+var interpKeyFrame = [];
+
+var TIME_START = 0;
+var TIME_END = 1;
+var FOV = 2;
+var POS_X = 3;
+var POS_Y = 4;
+var POS_Z = 5;
+var TARGET_X = 6;
+var TARGET_Y = 7;
+var TARGET_Z = 8;
+var UP_X = 9;
+var UP_Y = 10;
+var UP_Z = 11;
+var INTERPOLATION = 12;
+var CAM = 13;
+var DISTANCE = 14;
+
+var INTERP_LINEAR = 0;
+var INTERP_QUADRATIC = 1;
+var INTERP_QUAD_DIST = 2;
 
 function init() {
-  var WIDTH = $('.rest').width() - 5,
-      HEIGHT = $('.rest').height() - 5,
-      VIEW_ANGLE = 45,
-      ASPECT = WIDTH / HEIGHT,
-      NEAR = 0.1,
-      FAR = 10000;
+  WIDTH = $('.rest').width() - 5;
+  HEIGHT = $('.rest').height() - 5;
+  VIEW_ANGLE = 45;
+  ASPECT = WIDTH / HEIGHT;
+  NEAR = 0.1;
+  FAR = 1000;
 
   //console.log('Size: ' + WIDTH + ' ' + HEIGHT);
 
   tempVec = new THREE.Vector3();
+  tempTarget = new THREE.Vector3();
   tempColor = new THREE.Color();
   uniformScaleVec = new THREE.Vector3(1,1,1);
   zeroVec = new THREE.Vector3(0,0,0);
@@ -163,10 +192,19 @@ function init() {
   whackerPlateMtl = new THREE.MeshPhysicalMaterial({ color: whackerPlateColor, roughness: 0.64, metalness: 0.67 });
   connectorGeo = new THREE.CylinderBufferGeometry(connectorRadius, connectorRadius, 1, 20, 1, true);
 
-  camera.position.x = -210;
-  camera.position.y = 150;
-  camera.position.z = 170;
-  //camera.lookAt(new THREE.Vector3(0, 0, 0));
+  if (runAnimation) {
+    var xOff = 4 * keyLengthSpacing + keyLengthOffset;
+    camera.position.x = xOff;
+    camera.position.y = 200;
+    camera.position.z = 0;
+    camera.up.set(1,0,0);
+    camera.lookAt(new THREE.Vector3(xOff, 0, 0));
+  } else {
+    camera.position.x = -210;
+    camera.position.y = 150;
+    camera.position.z = 170;
+    camera.lookAt(new THREE.Vector3((keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0, 0));
+  }
 
   // start the renderer
   renderer.setSize(WIDTH, HEIGHT);
@@ -182,11 +220,10 @@ function init() {
 
   addControls();
 
-  controls.target.set( (keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0.8*housingOuterRadius, 0 );
-
   window.addEventListener( 'resize', onWindowResize, false );
 
   fillScene();
+  setUpAnimation();
 }
 
 function onWindowResize() {
@@ -199,17 +236,69 @@ function onWindowResize() {
 }
 
 function addControls() {
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.screenSpacePanning = true;
-  controls.rotateSpeed = 3;
-  controls.zoomSpeed = 1;
-  controls.panSpeed = 1;
+  if (!runAnimation) {
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.screenSpacePanning = true;
+    controls.rotateSpeed = 3;
+    controls.zoomSpeed = 1;
+    controls.panSpeed = 1;
 
-  //var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
-  //controls.minDistance = radius * 0.1;
-  //controls.maxDistance = radius * 25;
+    controls.target.set( (keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0.8*housingOuterRadius, 0 );
 
-  //controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
+    //var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
+    //controls.minDistance = radius * 0.1;
+    //controls.maxDistance = radius * 25;
+
+    //controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
+  }
+}
+
+function setUpAnimation() {
+  if ( runAnimation ) {
+    // center of keyboard in X
+    var xOff = 4 * keyLengthSpacing + keyLengthOffset;
+    var xOff2 = 0 * keyLengthSpacing + keyLengthOffset;
+    var xOff3 = 8 * keyLengthSpacing + keyLengthOffset;
+    //                times   fov   position                  target                  up        type of transition to next
+    // top view
+    keyFrames.push( [ -6,  0,  45,  xOff,         200,     0,  xOff, -ballRadius, 0,   1, 0, 0,  INTERP_QUADRATIC, null, 0] );
+    // rotate 90
+    keyFrames.push( [  4,  5,  45,  xOff,         160,     0,  xOff, -ballRadius, 0,   0, 0,-1,  INTERP_QUAD_DIST, null, 0] );
+    // side view up close
+    keyFrames.push( [  8,  8,  45,  xOff, -ballRadius,   -70,  xOff, -ballRadius, 0,   0, 1, 0,  INTERP_LINEAR, null, 0] );
+    // pull back
+    keyFrames.push( [ 11, 11,  45,  xOff, -ballRadius,  -200,  xOff, -ballRadius, 0,   0, 1, 0,  INTERP_QUADRATIC, null, 0] );
+    // flip view
+    keyFrames.push( [ 15, 16,  45,  xOff,  -ballRadius, -200,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_LINEAR, null, 0] );
+    // pull "up" (down)
+    keyFrames.push( [ 22, 22,  45,  xOff2, -200-ballRadius, -100,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_QUAD_DIST, null, 0] );
+    // rotate around
+    keyFrames.push( [ 28, 40,  45,  xOff2, -200-ballRadius, 100,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_QUAD_DIST, null, 0] );
+
+    for ( var i = 0; i < keyFrames.length; i++ ) {
+      var keyFrame = keyFrames[i];
+      initKeyFrameCamera(keyFrame);
+    }
+
+    // values don't matter, except for camera.
+    interpKeyFrame = [ 0, 0, 45,  xOff,  200,    0,  xOff, -ballRadius*5, 0,   1, 0, 0,  INTERP_LINEAR, null];
+    initKeyFrameCamera(interpKeyFrame);
+  }
+}
+
+function initKeyFrameCamera( keyFrame )
+{
+  var cam = new THREE.PerspectiveCamera(keyFrame[FOV], ASPECT, NEAR, FAR);
+  cam.position.set( keyFrame[POS_X], keyFrame[POS_Y], keyFrame[POS_Z] );
+  cam.up.set( keyFrame[UP_X], keyFrame[UP_Y], keyFrame[UP_Z] );
+  tempVec.set( keyFrame[TARGET_X], keyFrame[TARGET_Y], keyFrame[TARGET_Z] );
+  cam.lookAt( tempVec );
+  keyFrame[CAM] = cam;
+
+  // distance between pos and target
+  tempVec.set( keyFrame[POS_X], keyFrame[POS_Y], keyFrame[POS_Z] );
+  tempTarget.set( keyFrame[TARGET_X], keyFrame[TARGET_Y], keyFrame[TARGET_Z] );
+  keyFrame[DISTANCE] = tempVec.sub( tempTarget ).length();
 }
 
 function fillScene() {
@@ -224,7 +313,6 @@ function fillScene() {
 
 function addLighting() {
   var dirLight = new THREE.DirectionalLight( 0xbbbbbb, 1 );
-  dirLight.name = 'Dir. Light';
   dirLight.position.set( 0, dropperHeight+dropperPartHeight+1, 0 );
   dirLight.castShadow = true;
   dirLight.shadow.camera.near = 0;
@@ -249,6 +337,11 @@ function addLighting() {
   headlight.position.copy(camera.position);
 
   scene.add(headlight);
+
+  var dirLight = new THREE.DirectionalLight( 0x777777, 1 );
+  dirLight.position.set( 0, -200, 0 );
+  scene.add( dirLight );
+
 
 /*light2.position.x = 200;
   light2.position.y = 200;
@@ -419,7 +512,7 @@ function addHousing() {
   scene.add(housingCap2);
   
   var spindle = new THREE.Mesh(
-    new THREE.CylinderBufferGeometry( spindleRadius, spindleRadius, housingWidth + 4*housingThickness, 10, 1),
+    new THREE.CylinderBufferGeometry( spindleRadius, spindleRadius, housingWidth + 4*housingThickness, 24, 1),
     whackerMtl
   );
   spindle.rotation.set(Math.PI/2, 0, 0);
@@ -993,6 +1086,73 @@ function resetTimer(songTime) {
   localStartTime = Date.now();
 }
 
+function animateCamera(camera, currTime, retTarget) {
+  currTime /= 1000;
+  var done = false;
+  var useQuat = false;
+  // put time into seconds
+  for ( var i = 0; i < keyFrames.length && !done; i++ ) {
+    var keyFrame = keyFrames[i];
+    if ( keyFrame[TIME_START] <= currTime && keyFrame[TIME_END] >= currTime ) {
+      // easy: set to this camera
+      setCameraFromKeyframe(camera, keyFrame, useQuat, retTarget);
+      done = true;
+    } else if ( i < keyFrames.length-1 ) {
+      // look at next keyframe and see if there's an overlap
+      if ( keyFrame[TIME_END] <= currTime && keyFrames[i+1][TIME_START] >= currTime ) {
+        // interpolate between frames
+        var nextKeyFrame = keyFrames[i+1];
+        var interp = lerpClamp( currTime, keyFrame[TIME_END], nextKeyFrame[TIME_START] );
+        if ( keyFrame[INTERPOLATION] === INTERP_QUADRATIC || keyFrame[INTERPOLATION] === INTERP_QUAD_DIST ) {
+          interp = tweenQuadraticInOut(interp);
+        }
+        // interpolate position, target, and FOV linearly (as modified by tween)
+        for ( var j = FOV; j <= UP_Z; j++ ) {
+          interpKeyFrame[j] = keyFrame[j] + interp*(nextKeyFrame[j]-keyFrame[j] );
+        }
+
+        // now, we interpolate "up" by slerp
+        interpKeyFrame[CAM].quaternion.copy( keyFrame[CAM].quaternion );
+        interpKeyFrame[CAM].quaternion.slerp(nextKeyFrame[CAM].quaternion, interp);
+        // now the quaternion is set
+        useQuat = true;
+
+        //keyFrame[QUAT], nextKeyFrame[QUAT] );
+        if ( keyFrame[INTERPOLATION] === INTERP_QUAD_DIST ) {
+          // maintain distance of position to target.
+          var dist = keyFrame[DISTANCE] + interp*(nextKeyFrame[DISTANCE]-keyFrame[DISTANCE] );
+          tempVec.set( interpKeyFrame[POS_X], interpKeyFrame[POS_Y], interpKeyFrame[POS_Z] );
+          tempTarget.set( interpKeyFrame[TARGET_X], interpKeyFrame[TARGET_Y], interpKeyFrame[TARGET_Z] );
+          tempVec.sub( tempTarget ).normalize().multiplyScalar(dist);
+          tempTarget.add( tempVec );
+          interpKeyFrame[POS_X] = tempTarget.x;
+          interpKeyFrame[POS_Y] = tempTarget.y;
+          interpKeyFrame[POS_Z] = tempTarget.z;
+        }
+        setCameraFromKeyframe(camera, interpKeyFrame, useQuat, retTarget );
+        done = true;
+      }
+    }
+  }
+}
+
+function setCameraFromKeyframe(camera, keyFrame, useQuat, retTarget) {
+  retTarget.set( keyFrame[TARGET_X], keyFrame[TARGET_Y], keyFrame[TARGET_Z] );
+  camera.fov = keyFrame[FOV];
+  camera.position.set( keyFrame[POS_X], keyFrame[POS_Y], keyFrame[POS_Z] );
+  if ( useQuat ) {
+    // TODO This should only affect the up direction, not the target
+    tempVec.set( 0,1,0 ); //keyFrame[UP_X], keyFrame[UP_Y], keyFrame[UP_Z] );
+    tempVec.applyQuaternion( keyFrame[CAM].quaternion );
+    camera.up.copy( tempVec );
+    //camera.quaternion.copy( keyFrame[CAM].quaternion ); 
+  } else {
+    camera.up.set( keyFrame[UP_X], keyFrame[UP_Y], keyFrame[UP_Z] );
+  }
+  camera.lookAt( retTarget );
+  camera.updateProjectionMatrix();
+}
+
 function animate() {
 
   headlight.position.copy(camera.position);
@@ -1004,8 +1164,6 @@ function animate() {
   }
   requestAnimationFrame(animate);
 
-  controls.update();
-
   // first time called, establish what time it is when the song starts
   localStartTime = localStartTime || Date.now();
   
@@ -1016,6 +1174,14 @@ function animate() {
 
   if ( !debugFreezeFrame ) {
 
+    if (runAnimation) {
+      animateCamera(camera, currTime, tempTarget);
+    } else {
+      // TODO: it'd be nice to have controls take over if touched.
+      controls.update();
+      //controls.target.copy(tempTarget);
+    }
+  
     // ugh - sometimes there are jumps backwards in time, causing weirdness with the animation TODO
     //if ( debugPrevTime > currTime ) {
     //  console.log(" TIME JUMP " + debugPrevTime + " to " + currTime );
