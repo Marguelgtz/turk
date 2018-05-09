@@ -1,6 +1,6 @@
 "use strict";
 
-var runAnimation = false;
+var runAnimation = true;
 
 var renderer, scene, camera, controls, headlight;
 var cameraSet = [];
@@ -105,8 +105,9 @@ var ballGeo, dropperGeo, whackerArmGeo, whackerPlateGeo, connectorGeo;
 var ballMtl, dropperMtl, whackerMtl, whackerPlateMtl;
 
 var tempVec;
-var tempTarget;
+var tempVec2;
 var tempColor;
+var currentTarget;
 var uniformScaleVec;
 var zeroVec;
 var yAxis;
@@ -145,6 +146,8 @@ var DISTANCE = 14;
 var INTERP_LINEAR = 0;
 var INTERP_QUADRATIC = 1;
 var INTERP_QUAD_DIST = 2;
+var INTERP_QUAD_IN = 3;
+var INTERP_QUAD_OUT = 4;
 
 function init() {
   WIDTH = $('.rest').width() - 5;
@@ -157,7 +160,8 @@ function init() {
   //console.log('Size: ' + WIDTH + ' ' + HEIGHT);
 
   tempVec = new THREE.Vector3();
-  tempTarget = new THREE.Vector3();
+  tempVec2 = new THREE.Vector3();
+  currentTarget = new THREE.Vector3();
   tempColor = new THREE.Color();
   uniformScaleVec = new THREE.Vector3(1,1,1);
   zeroVec = new THREE.Vector3(0,0,0);
@@ -192,18 +196,19 @@ function init() {
   whackerPlateMtl = new THREE.MeshPhysicalMaterial({ color: whackerPlateColor, roughness: 0.64, metalness: 0.67 });
   connectorGeo = new THREE.CylinderBufferGeometry(connectorRadius, connectorRadius, 1, 20, 1, true);
 
+  var xOff = 4 * keyLengthSpacing + keyLengthOffset;
   if (runAnimation) {
-    var xOff = 4 * keyLengthSpacing + keyLengthOffset;
     camera.position.x = xOff;
     camera.position.y = 200;
     camera.position.z = 0;
     camera.up.set(1,0,0);
     camera.lookAt(new THREE.Vector3(xOff, 0, 0));
   } else {
-    camera.position.x = -210;
-    camera.position.y = 150;
-    camera.position.z = 170;
-    camera.lookAt(new THREE.Vector3((keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0, 0));
+    camera.position.x = -190;
+    camera.position.y = 110;
+    camera.position.z = 125;
+    camera.lookAt(new THREE.Vector3(xOff, 0, 0));
+    //camera.lookAt(new THREE.Vector3((keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0, 0));
   }
 
   // start the renderer
@@ -236,21 +241,25 @@ function onWindowResize() {
 }
 
 function addControls() {
-  if (!runAnimation) {
+  if (runAnimation) {
+    controls = new THREE.TrackballControls(camera, renderer.domElement);
+  } else {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.screenSpacePanning = true;
-    controls.rotateSpeed = 3;
-    controls.zoomSpeed = 1;
-    controls.panSpeed = 1;
-
-    controls.target.set( (keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0.8*housingOuterRadius, 0 );
-
-    //var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
-    //controls.minDistance = radius * 0.1;
-    //controls.maxDistance = radius * 25;
-
-    //controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
   }
+
+  controls.screenSpacePanning = true;
+  controls.rotateSpeed = 3;
+  controls.zoomSpeed = 1;
+  controls.panSpeed = 1;
+
+  controls.target.set( 4 * keyLengthSpacing + keyLengthOffset, 0, 0 );
+  //controls.target.set( (keyLengthOffset + keyLengthSpacing*7 - keyLength/2)/2, 0.8*housingOuterRadius, 0 );
+
+  //var radius = 100 * 0.75; // scalar value used to determine relative zoom distances
+  //controls.minDistance = radius * 0.1;
+  //controls.maxDistance = radius * 25;
+
+  //controls.keys = [65, 83, 68]; // [ rotateKey, zoomKey, panKey ]
 }
 
 function setUpAnimation() {
@@ -259,29 +268,73 @@ function setUpAnimation() {
     var xOff = 4 * keyLengthSpacing + keyLengthOffset;
     var xOff2 = 0 * keyLengthSpacing + keyLengthOffset;
     var xOff3 = 8 * keyLengthSpacing + keyLengthOffset;
+    var zOff = keyWidthSpacing/2;
     //                times   fov   position                  target                  up        type of transition to next
     // top view
-    keyFrames.push( [ -6,  0,  45,  xOff,         200,     0,  xOff, -ballRadius, 0,   1, 0, 0,  INTERP_QUADRATIC, null, 0] );
+    keyFrames.push( [ -6,  0,  45,  xOff,         200,     0,  xOff, -ballRadius, 0,   1, 0, 0,  INTERP_QUAD_OUT, null, 0] );
+    var t = 3;
     // rotate 90
-    keyFrames.push( [  4,  5,  45,  xOff,         160,     0,  xOff, -ballRadius, 0,   0, 0,-1,  INTERP_QUAD_DIST, null, 0] );
+    keyFrames.push( [ t, t+1,  45,  xOff,         160,     0,  xOff, -ballRadius, 0,   0, 0,-1,  INTERP_QUAD_DIST, null, 0] ); t += 4;
     // side view up close
-    keyFrames.push( [  8,  8,  45,  xOff, -ballRadius,   -70,  xOff, -ballRadius, 0,   0, 1, 0,  INTERP_LINEAR, null, 0] );
+    keyFrames.push( [ t, t+1,  45,  xOff, -ballRadius,   -70,  xOff, -ballRadius, 0,   0, 1, 0,  INTERP_LINEAR, null, 0] ); t += 4;
     // pull back
-    keyFrames.push( [ 11, 11,  45,  xOff, -ballRadius,  -200,  xOff, -ballRadius, 0,   0, 1, 0,  INTERP_QUADRATIC, null, 0] );
+    keyFrames.push( [ t, t+1,  45,  xOff, -ballRadius,  -200,  xOff, -ballRadius, 0,   0, 1, 0,  INTERP_QUADRATIC, null, 0] ); t += 4;
     // flip view
-    keyFrames.push( [ 15, 16,  45,  xOff,  -ballRadius, -200,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_LINEAR, null, 0] );
+    keyFrames.push( [ t, t+1,  45,  xOff,  -ballRadius, -200,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_LINEAR, null, 0] ); t += 4;
     // pull "up" (down)
-    keyFrames.push( [ 22, 22,  45,  xOff2, -200-ballRadius, -100,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_QUAD_DIST, null, 0] );
+    keyFrames.push( [ t, t+1,  45,  xOff2, -200-ballRadius, -100,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_QUAD_DIST, null, 0] ); t += 4;
     // rotate around
-    keyFrames.push( [ 28, 40,  45,  xOff2, -200-ballRadius, 100,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_QUAD_DIST, null, 0] );
+    keyFrames.push( [ t, t+4,  45,  xOff2, -200-ballRadius, 100,  xOff, -ballRadius, 0,   0,-1, 0,  INTERP_QUADRATIC, null, 0] ); t += 6;
+    // outside whackers
+    keyFrames.push( [ t, t,    45,  -100, 5*ballRadius, 0,     0, ballRadius, 0,   0, 1, 0,  INTERP_QUAD_DIST, null, 0] ); t += 2;
+    keyFrames.push( [ t, t,    45,  0, 5*ballRadius, -100,  0, ballRadius, 0,   0, 1, 0,  INTERP_QUAD_IN, null, 0] ); t += 2;
+    // view whackers
+    keyFrames.push( [ t, t,  45,  0, 5*ballRadius, -70,  0, ballRadius, 0,   0,1,0,  INTERP_QUAD_OUT, null, 0] ); t += 3;
+    keyFrames.push( [ t, t,  45,  0, 5*ballRadius, 0,  0, ballRadius, 70,   0,1,0,  INTERP_QUADRATIC, null, 0] ); t += 1;
+    // rotate to look up
+    keyFrames.push( [ t, t,  45,  0,5*ballRadius,0,  0,dropperHeight,0,   0,0,-1,  INTERP_QUADRATIC, null, 0] ); t += 3;
+    // zoom up
+    keyFrames.push( [ t, t,  45,  0,dropperHeight-10,0,  0,dropperHeight,0,  1,0,0,  INTERP_QUADRATIC, null, 0] ); t += 1;
+    // rotate horizontal
+    keyFrames.push( [ t, t,  45,  30,dropperHeight,0,  0,dropperHeight,0,   0,1,0,  INTERP_QUAD_IN, null, 0] ); t += 2;
+    // then down for drop
+    keyFrames.push( [ t, t+1,  45,  0,dropperHeight-10,0,  0,0,0,   -1,0,0,  INTERP_QUAD_OUT, null, 0] ); t += 2;
+    // drop!
+    keyFrames.push( [ t, t,  45,  0,ballRadius,0,  0,0,0,   -1,0,0,  INTERP_QUAD_OUT, null, 0] ); 
+    
+    var steps = 10;
+    var i, f;
+    for ( i = 0; i < steps; i++ ) {
+      f = (i+1)/steps;
+      t += 1/steps;
+      // bounce up
+      keyFrames.push( [ t, t,  45,  f*xOff/2,Math.sqrt(f)*(bounceHeight+20)+ballRadius,f*zOff/2,  f*xOff/2,0,f*zOff/2,   -1,0,0,  INTERP_LINEAR, null, 0] );
+    }
+    for ( i = 0; i < steps; i++ ) {
+      f = (steps-i-1)/steps;
+      t += 1/steps;
+      // bounce down
+      keyFrames.push( [ t, t,  45,  (2-f)*xOff/2,Math.sqrt(f)*(bounceHeight+20)+ballRadius,(2-f)*zOff/2,  (2-f)*xOff/2,0,(2-f)*zOff/2,   -1,0,0,  INTERP_LINEAR, null, 0] );
+    }
+    // look around
+    t += 2;
+    keyFrames.push( [ t, t,  45,  xOff,ballRadius,zOff,  2*xOff,ballRadius,zOff,   0,1,0,  INTERP_QUAD_IN, null, 0] ); t += 3;
+    keyFrames.push( [ t, t,  45,  xOff,ballRadius,zOff,  xOff,ballRadius,zOff+xOff,   0,1,0,  INTERP_QUAD_OUT, null, 0] ); t += 3;
+    keyFrames.push( [ t, t+1,  45,  xOff,ballRadius,zOff,  0,ballRadius,zOff,   0,1,0,  INTERP_QUAD_IN, null, 0] ); t += 3;
+    // fall off
+    keyFrames.push( [ t, t,  45,  xOff,ballRadius,0,  0,ballRadius,0,   0,1,0,  INTERP_QUAD_OUT, null, 0] ); t += 3;
+    keyFrames.push( [ t, t+1,  45,  xOff,-200+ballRadius,0,  xOff,ballRadius,0,   0,0,1,  INTERP_QUAD_OUT, null, 0] ); t += 5;
+    // final position
+    keyFrames.push( [ t, t,  45,  -190,110,125,  xOff,0,0,   0,1,0,  INTERP_QUAD_OUT, null, 0] ); t += 3;
 
-    for ( var i = 0; i < keyFrames.length; i++ ) {
+    // make cameras for all frames
+    for ( i = 0; i < keyFrames.length; i++ ) {
       var keyFrame = keyFrames[i];
       initKeyFrameCamera(keyFrame);
     }
 
-    // values don't matter, except for camera.
-    interpKeyFrame = [ 0, 0, 45,  xOff,  200,    0,  xOff, -ballRadius*5, 0,   1, 0, 0,  INTERP_LINEAR, null];
+    // make frame we use for interpolation; values will get filled in later, given some here just because
+    interpKeyFrame = [ 0, 0, 45,  xOff,  200,    0,  xOff, -ballRadius*5, 0,   1, 0, 0,  INTERP_LINEAR, null, 0];
     initKeyFrameCamera(interpKeyFrame);
   }
 }
@@ -297,8 +350,8 @@ function initKeyFrameCamera( keyFrame )
 
   // distance between pos and target
   tempVec.set( keyFrame[POS_X], keyFrame[POS_Y], keyFrame[POS_Z] );
-  tempTarget.set( keyFrame[TARGET_X], keyFrame[TARGET_Y], keyFrame[TARGET_Z] );
-  keyFrame[DISTANCE] = tempVec.sub( tempTarget ).length();
+  tempVec2.set( keyFrame[TARGET_X], keyFrame[TARGET_Y], keyFrame[TARGET_Z] );
+  keyFrame[DISTANCE] = tempVec.sub( tempVec2 ).length();
 }
 
 function fillScene() {
@@ -1059,6 +1112,15 @@ function tweenQuadraticInOut(k) {
   return - 0.5 * (--k * (k - 2) - 1);
 }
 
+function tweenQuadraticIn(k) {
+  return k * k;
+}
+
+function tweenQuadraticOut(k) {
+  return k * (2 - k);
+}
+
+
 function resetKeyCounts() {
   for (var i = 0; i < numKeys; i++) {
     var key = keys[i];
@@ -1106,6 +1168,12 @@ function animateCamera(camera, currTime, retTarget) {
         if ( keyFrame[INTERPOLATION] === INTERP_QUADRATIC || keyFrame[INTERPOLATION] === INTERP_QUAD_DIST ) {
           interp = tweenQuadraticInOut(interp);
         }
+        else if ( keyFrame[INTERPOLATION] === INTERP_QUAD_IN ) {
+          interp = tweenQuadraticIn(interp);
+        }
+        else if ( keyFrame[INTERPOLATION] === INTERP_QUAD_OUT ) {
+          interp = tweenQuadraticOut(interp);
+        }
         // interpolate position, target, and FOV linearly (as modified by tween)
         for ( var j = FOV; j <= UP_Z; j++ ) {
           interpKeyFrame[j] = keyFrame[j] + interp*(nextKeyFrame[j]-keyFrame[j] );
@@ -1122,12 +1190,12 @@ function animateCamera(camera, currTime, retTarget) {
           // maintain distance of position to target.
           var dist = keyFrame[DISTANCE] + interp*(nextKeyFrame[DISTANCE]-keyFrame[DISTANCE] );
           tempVec.set( interpKeyFrame[POS_X], interpKeyFrame[POS_Y], interpKeyFrame[POS_Z] );
-          tempTarget.set( interpKeyFrame[TARGET_X], interpKeyFrame[TARGET_Y], interpKeyFrame[TARGET_Z] );
-          tempVec.sub( tempTarget ).normalize().multiplyScalar(dist);
-          tempTarget.add( tempVec );
-          interpKeyFrame[POS_X] = tempTarget.x;
-          interpKeyFrame[POS_Y] = tempTarget.y;
-          interpKeyFrame[POS_Z] = tempTarget.z;
+          tempVec2.set( interpKeyFrame[TARGET_X], interpKeyFrame[TARGET_Y], interpKeyFrame[TARGET_Z] );
+          tempVec.sub( tempVec2 ).normalize().multiplyScalar(dist);
+          tempVec2.add( tempVec );
+          interpKeyFrame[POS_X] = tempVec2.x;
+          interpKeyFrame[POS_Y] = tempVec2.y;
+          interpKeyFrame[POS_Z] = tempVec2.z;
         }
         setCameraFromKeyframe(camera, interpKeyFrame, useQuat, retTarget );
         done = true;
@@ -1167,7 +1235,8 @@ function animate() {
   // first time called, establish what time it is when the song starts
   localStartTime = localStartTime || Date.now();
   
-  var timeFromStart = Date.now() - localStartTime;
+  var debugTime = 0 * 1000;
+  var timeFromStart = Date.now() - localStartTime + debugTime;
   
   // currTime is how far into the song itself we are
   var currTime = timeInSong + timeFromStart;
@@ -1175,11 +1244,14 @@ function animate() {
   if ( !debugFreezeFrame ) {
 
     if (runAnimation) {
-      animateCamera(camera, currTime, tempTarget);
-    } else {
-      // TODO: it'd be nice to have controls take over if touched.
-      controls.update();
-      //controls.target.copy(tempTarget);
+      animateCamera(camera, currTime, currentTarget);
+      controls.target.copy( currentTarget );
+    }
+
+    // have controls take over if touched.
+    controls.update();
+    if (runAnimation && controls.activated) {
+      runAnimation = false;
     }
   
     // ugh - sometimes there are jumps backwards in time, causing weirdness with the animation TODO
