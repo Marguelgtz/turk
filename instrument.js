@@ -45,6 +45,8 @@ var ballScatterHeight = keyLength - 2 * ballRadius;
 
 // should not be larger than crossbarRadius
 var connectorRadius = 0.3 * ballRadius;
+// in milliseconds. If two notes are within this time of each other, consider them a chord.
+var connectorGap = 10;
 
 // how much does a ball add to the height of a key? The right part is "correct", preserving volume. 1.5 is fudge.
 var scaleCount = 1.5 * ((4/3)*Math.PI*ballRadius*ballRadius*ballRadius)/(keyLength*keyWidth);
@@ -650,7 +652,7 @@ function addBallsToMusic(t) {
         addBall(keyID, currentDropper, note.time);
         addWhacker(keyID, currentDropper, note.time);
         // if notes are within 10/1000ths of a second, consider it a chord
-        if ( prevBall && prevNoteTime + 0 >= note.time ) {
+        if ( prevBall && prevNoteTime + connectorGap >= note.time ) {
           // previous note's time matches this note's, so make a connector
           addConnector( prevBall, balls[balls.length-1])
         }
