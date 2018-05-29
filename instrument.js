@@ -126,6 +126,7 @@ var WIDTH, HEIGHT, VIEW_ANGLE, ASPECT, NEAR, FAR;
 
 var keyFrames = [];
 var interpKeyFrame = [];
+var currentFrame = 0;
 
 var TIME_START = 0;
 var TIME_END = 1;
@@ -323,7 +324,7 @@ function setUpAnimation() {
     keyFrames.push( [ t, t+1,  45,  xOff,ballRadius,zOff,  0,ballRadius,zOff,   0,1,0,  INTERP_QUAD_IN, null, 0] ); t += 3;
     // fall off
     keyFrames.push( [ t, t,  45,  xOff,ballRadius,0,  0,ballRadius,0,   0,1,0,  INTERP_QUAD_OUT, null, 0] ); t += 3;
-    keyFrames.push( [ t, t+1,  45,  xOff,-200+ballRadius,0,  xOff,ballRadius,0,   0,0,1,  INTERP_QUAD_OUT, null, 0] ); t += 5;
+    keyFrames.push( [ t, t+1,  45,  xOff,-500+ballRadius,0,  xOff,ballRadius,0,   1,0,0,  INTERP_QUAD_OUT, null, 0] ); t += 5;
     // final position
     keyFrames.push( [ t, t,  45,  -190,110,125,  xOff,0,0,   0,1,0,  INTERP_QUAD_OUT, null, 0] ); t += 3;
 
@@ -1133,6 +1134,7 @@ function resetKeyCounts() {
 
 function newTune() {
   notesIndex = 0;
+  currentFrame = 0;
   clearBalls();
   clearWhackers();
   clearConnectors();
@@ -1153,12 +1155,14 @@ function animateCamera(camera, currTime, retTarget) {
   var done = false;
   var useQuat = false;
   // put time into seconds
-  for ( var i = 0; i < keyFrames.length && !done; i++ ) {
+  for ( var i = currentFrame; i < keyFrames.length && !done; i++ ) {
     var keyFrame = keyFrames[i];
-    if ( keyFrame[TIME_START] <= currTime && keyFrame[TIME_END] >= currTime ) {
+    // keyFrame[TIME_START] <= currTime && - needed only if currentFrame is not used
+    if ( keyFrame[TIME_END] >= currTime ) {
       // easy: set to this camera
       setCameraFromKeyframe(camera, keyFrame, useQuat, retTarget);
       done = true;
+      currentFrame = i;
     } else if ( i < keyFrames.length-1 ) {
       // look at next keyframe and see if there's an overlap
       if ( keyFrame[TIME_END] <= currTime && keyFrames[i+1][TIME_START] >= currTime ) {
@@ -1198,6 +1202,7 @@ function animateCamera(camera, currTime, retTarget) {
           interpKeyFrame[POS_Z] = tempVec2.z;
         }
         setCameraFromKeyframe(camera, interpKeyFrame, useQuat, retTarget );
+        currentFrame = i;
         done = true;
       }
     }
