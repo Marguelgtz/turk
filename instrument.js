@@ -313,7 +313,6 @@ function setUpAnimation() {
       // bounce up
       sqrf = 1-(1-f)*(1-f);
       keyFrames.push( [ t, t,  45,  f*xOff/2,sqrf*(bounceHeight+20)+ballRadius,f*zOff/2,  f*xOff/2,0,f*zOff/2,   -1,0,0,  INTERP_LINEAR, null, 0] );
-      console.log(keyFrames[keyFrames.length-1][1] + ' and ' + keyFrames[keyFrames.length-1][3] + ' and '+ keyFrames[keyFrames.length-1][4]);
     }
     for ( i = 0; i < steps; i++ ) {
       f = (steps-i-1)/steps;
@@ -321,7 +320,6 @@ function setUpAnimation() {
       // bounce down
       sqrf = 1-(1-f)*(1-f);
       keyFrames.push( [ t, t,  45,  (2-f)*xOff/2,sqrf*(bounceHeight+20)+ballRadius,(2-f)*zOff/2,  (2-f)*xOff/2,0,(2-f)*zOff/2,   -1,0,0,  INTERP_LINEAR, null, 0] );
-      console.log(keyFrames[keyFrames.length-1][1] + ' and ' + keyFrames[keyFrames.length-1][3] + ' and '+ keyFrames[keyFrames.length-1][4]);
     }
     // look around
     t += 2;
