@@ -24,4 +24,6 @@ The PipeGeometry is an update of the [TubeGeometry code](https://github.com/Troi
 
 Because it requires high-precision MIDI playing, this demo is usually best with Chrome. I recommend letting it run half a minute when you start up, so that all the libraries needed load and are in cache, then refresh the web page. Even then there's a glitch at the beginning of any tune - I may figure that out someday (hints appreciated). Note that you can interact at any point during the animation and take control. When you change music, you may also need to hit "reload."
 
+If you download the code and run it locally, you'll want to run it under a server such as Node.js. Just loading the index.html file won't give you sound.
+
 Just not working but you want to see the thing run? See [the YouTube video](https://youtu.be/plBX-CFx5DM), with the starting glitch and all.
