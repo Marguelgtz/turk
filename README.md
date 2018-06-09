@@ -3,7 +3,7 @@
 
 An Animusic-inspired machine that plays classical music with ball bearings, and shows a summary of the notes played.
 
-[Run the demo](https://bit.ly/datanimusic).
+[Run the demo!](https://bit.ly/datanimusic)
 
 [![Screenshot](http://erich.realtimerendering.com/datanimusic/screenshot1.png)](https://github.com/erich666/turk)
 
@@ -22,4 +22,6 @@ and a lot of the code and _all_ of the pieces are from [Euphony](https://github.
 
 The PipeGeometry is an update of the [TubeGeometry code](https://github.com/Troilk/cs291-contest) by [Vitalii Maslikov](https://github.com/Troilk).
 
-Because it requires high-precision MIDI playing, this demo is usually best with Chrome. Even then, you may get hesitations. When you change music, you may also need to hit "reload."
+Because it requires high-precision MIDI playing, this demo is usually best with Chrome. I recommend letting it run half a minute when you start up, so that all the libraries needed load and are in cache, then refresh the web page. Even then there's a glitch at the beginning of any tune - I may figure that out someday (hints appreciated). Note that you can interact at any point during the animation and take control. When you change music, you may also need to hit "reload."
+
+Just not working but you want to see the thing run? See [the YouTube video](https://youtu.be/plBX-CFx5DM), with the starting glitch and all.
